@@ -33,7 +33,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500 rounded-full mb-4 shadow-md">
               <Car className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-800 mb-2">AutoAdmin</h2>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">APIPA Admin</h2>
             <p className="text-gray-500">Connectez-vous à votre tableau de bord</p>
           </div>
 

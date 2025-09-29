@@ -24,7 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { id: 'cartography', label: 'Cartographie', icon: Map },
-    { id: 'material-requests', label: 'Remblai', icon: Package },
+    { id: 'material-requests', label: 'Demande FN', icon: Package },
     { id: 'field-actions', label: 'Descente sur terrain', icon: MapPin },
     { id: 'pc-request', label: 'Demande PC - Permis de construction', icon: FileText },
     { id: 'truck-authorization', label: 'Autorisation Camion', icon: Car },

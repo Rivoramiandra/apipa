@@ -3,6 +3,7 @@ import cors from "cors";
 import "dotenv/config";
 import "./config/db.js";
 
+// Routes
 import terrainRoutes from "./routes/TerrainRoutes.js";
 import remblaiRoutes from "./routes/remblaiRoute.js";
 import terrainNewRoutes from "./routes/TerrainNewRoute.js";
@@ -14,14 +15,20 @@ import titresansnomRoutes from "./routes/titresansnomRoutes.js";
 import truckRoutes from "./routes/autorisationCamionRoutes.js";
 import prescriptionRoute from './routes/prescriptionRoute.js';
 import decenteRoutes from './routes/decenteRoutes.js'; 
+import infractionRoutes from './routes/infractionRoutes.js'; 
+import demandePCRoutes from './routes/demandePCRoutes.js';
+import statsituationRoutes from "./routes/statsituationRoutes.js";
+import statcommuneRoutes from "./routes/statcommuneRoutes.js"; 
+import statDescentesRoutes from './routes/statDescentesRoute.js'; 
 
 const app = express();
 const PORT = 3000;
 
+// Middleware
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
 
-// Routes
+// --- ROUTES ---
 app.use("/api", terrainRoutes);
 app.use("/api", remblaiRoutes);
 app.use("/api/terrain", terrainNewRoutes);
@@ -33,12 +40,18 @@ app.use("/api/titresansnom", titresansnomRoutes);
 app.use('/api/autorisationcamion', truckRoutes);
 app.use('/api/prescriptions', prescriptionRoute);
 app.use('/api/descentes', decenteRoutes); 
+app.use('/api/infractions', infractionRoutes); 
+app.use('/api/demandepc', demandePCRoutes);
+app.use("/api", statsituationRoutes);
+app.use("/api", statcommuneRoutes);
+app.use('/api/stat-descentes', statDescentesRoutes); // route pour les stats des descentes
 
 // Simple home page
 app.get("/", (req, res) => {
   res.send("✅ Serveur Express fonctionne !");
 });
 
+// Lancement du serveur
 app.listen(PORT, () => {
   console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`);
 });
