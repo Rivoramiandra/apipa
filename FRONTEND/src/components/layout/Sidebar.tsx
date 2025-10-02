@@ -24,8 +24,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { id: 'cartography', label: 'Cartographie', icon: Map },
-    { id: 'material-requests', label: 'Demande FN', icon: Package },
-    { id: 'field-actions', label: 'Descente sur terrain', icon: MapPin },
+    { id: 'material-requests', label: 'Descente sur Terrain', icon:  MapPin},
+    { id: 'field-actions', label: 'Rendez-vous', icon:Package  },
     { id: 'pc-request', label: 'Demande PC - Permis de construction', icon: FileText },
     { id: 'truck-authorization', label: 'Autorisation Camion', icon: Car },
     // ❌ Notification retirée du menu principal

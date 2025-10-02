@@ -1,31 +1,13 @@
-import React, { useState, useRef, useEffect } from "react";
-import { MapContainer, TileLayer, FeatureGroup, LayersControl, useMapEvents } from "react-leaflet";
-import { EditControl } from "react-leaflet-draw";
-import * as turf from "@turf/turf";
+import React, { useState, useEffect } from "react";
 import { 
-  Plus, Search, User, MapPin, Home, Tag, ArrowRight, DollarSign, 
-  AlertTriangle, Globe, Edit, Eye, Clock, CheckCircle, AlertCircle, 
-  X, ChevronLeft, ChevronRight, Calendar, Map, FileText, Navigation,
-  Save, Trash2, FileDigit, ShieldAlert, Mail, Package, Receipt
+  Search, Edit, Eye, ChevronLeft, ChevronRight, 
+  Calendar, MapPin, FileText, User, ShieldAlert, 
+  AlertCircle, CheckCircle,  X, 
+  Save, Trash2, FileDigit, AlertTriangle, Home,
+  Clock, UserCheck
 } from 'lucide-react';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet-draw/dist/leaflet.draw.css';
-import L from 'leaflet';
 import axios from 'axios';
-
-// Fix icône Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-// Gestion du clic sur la carte
-function MapClickHandler({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }) {
-  useMapEvents({ click: e => onMapClick(e.latlng) });
-  return null;
-}
+import RendezvousComponent from "./RendezvousComponent";
 
 interface Descente {
   date_desce: Date;
@@ -59,50 +41,65 @@ interface Descente {
   situatio_1: string;
 }
 
-// Définition de l'état initial du formulaire
-const initialFormData = {
-  proprietaire: "",
-  commune: "",
-  fokontany: "",
-  localisation: "",
-  identification: "",
-  X_coord: 0,
-  Y_coord: 0,
-  superficie: 0,
-  infraction: "",
-  destination: "",
-  montant: 0,
-  actions: [] as string[],
-  modelePV: "PAT",
-  situation: "",
-  polygonCoords: [] as [number, number][],
-};
+interface Rendezvous {
+  id: string;
+  date: string;
+  heure: string;
+  lieu: string;
+  objet: string;
+  participants: string[];
+  statut: 'planifié' | 'en_cours' | 'terminé' | 'annulé';
+  notes: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+}
 
-// Fonction pour récupérer les statistiques d'infractions
-const fetchInfractionStats = async () => {
-  try {
-    const response = await axios.get("http://localhost:3000/api/infractions/categories");
-    return response.data.data;
-  } catch (error) {
-    console.error("Erreur lors de la récupération des statistiques d'infractions:", error);
-    return [];
+// Données mock pour les rendez-vous
+const mockRendezvous: Rendezvous[] = [
+  {
+    id: '1',
+    date: '2024-01-15',
+    heure: '09:00',
+    lieu: 'Commune d\'Antananarivo',
+    objet: 'Inspection terrain - Remblai illicite',
+    participants: ['Agent Dupont', 'Technicien GIS'],
+    statut: 'planifié',
+    notes: 'Prévoir les équipements de sécurité',
+    coordinates: { lat: -18.8792, lng: 47.5079 }
+  },
+  {
+    id: '2',
+    date: '2024-01-16',
+    heure: '14:30',
+    lieu: 'Zone industrielle Ivato',
+    objet: 'Contrôle construction sur domaine public',
+    participants: ['Agent Martin', 'Expert foncier'],
+    statut: 'planifié',
+    notes: 'Rencontre avec le propriétaire sur site',
+    coordinates: { lat: -18.7964, lng: 47.4799 }
+  },
+  {
+    id: '3',
+    date: '2024-01-10',
+    heure: '10:00',
+    lieu: 'Ambohidratrimo',
+    objet: 'Suivi régularisation',
+    participants: ['Agent Rousseau'],
+    statut: 'terminé',
+    notes: 'Dossier en cours de traitement'
   }
-};
+];
 
 const FieldActionsMap: React.FC = () => {
-  const mapRef = useRef<L.Map>(null);
-  const featureGroupRef = useRef<L.FeatureGroup>(null);
-  
-  const [formData, setFormData] = useState(initialFormData);
   const [listeDescentes, setListeDescentes] = useState<Descente[]>([]);
+  const [rendezvous, setRendezvous] = useState<Rendezvous[]>(mockRendezvous);
   const [infractionStats, setInfractionStats] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
-  const [searchCoords, setSearchCoords] = useState({ x: "", y: "" });
-  const [searchError, setSearchError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
-  const [showForm, setShowForm] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedDescente, setSelectedDescente] = useState<Descente | null>(null);
@@ -175,66 +172,63 @@ const FieldActionsMap: React.FC = () => {
     fetchDescentes();
   }, []);
 
-  // Chargement des statistiques d'infractions
+  // Calcul des statistiques de rendez-vous
   useEffect(() => {
-    const loadInfractionStats = async () => {
-      try {
-        setLoadingStats(true);
-        const stats = await fetchInfractionStats();
-        setInfractionStats(stats);
-      } catch (error) {
-        console.error("Erreur de chargement des stats:", error);
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-
-    loadInfractionStats();
-  }, []);
+    const stats = [
+      {
+        categorie_consolidee: 'Rendez-vous en cours',
+        nombre_de_terrains: rendezvous.filter(r => r.statut === 'en_cours').length
+      },
+      {
+        categorie_consolidee: 'Non-comparution',
+        nombre_de_terrains: rendezvous.filter(r => r.statut === 'annulé').length
+      },
+      {
+        categorie_consolidee: 'Rendez-vous avec comparution',
+        nombre_de_terrains: rendezvous.filter(r => r.statut === 'planifié').length
+      },
+      {
+        categorie_consolidee: 'Rendez-vous terminé',
+        nombre_de_terrains: rendezvous.filter(r => r.statut === 'terminé').length
+      },
+    ];
+    setInfractionStats(stats);
+    setLoadingStats(false);
+  }, [rendezvous]);
 
   // Fonction pour obtenir l'icône et la couleur selon la catégorie
   const getCategoryStyle = (categorie: string) => {
     const categorieLower = categorie.toLowerCase();
     
-    if (categorieLower.includes('remblai illicite') && !categorieLower.includes('construction')) {
-      return {
-        color: 'bg-red-500',
-        icon: <AlertTriangle className="w-8 h-8 text-white" />,
-        label: 'Remblai Illicite'
-      };
-    } else if (categorieLower.includes('construction sur remblai')) {
-      return {
-        color: 'bg-orange-500',
-        icon: <Home className="w-8 h-8 text-white" />,
-        label: 'Construction Remblai'
-      };
-    } else if (categorieLower.includes('domaines publics') || categorieLower.includes('digue') || categorieLower.includes('canal')) {
+    if (categorieLower.includes('en cours')) {
       return {
         color: 'bg-blue-500',
-        icon: <MapPin className="w-8 h-8 text-white" />,
-        label: 'Domaines Publics'
+        icon: <Clock className="w-8 h-8 text-white" />,
       };
-    } else if (categorieLower.includes('autres infractions')) {
+    } else if (categorieLower.includes('non-comparution')) {
+      return {
+        color: 'bg-red-500',
+        icon: <X className="w-8 h-8 text-white" />,
+      };
+    } else if (categorieLower.includes('avec comparution')) {
+      return {
+        color: 'bg-green-500',
+        icon: <UserCheck className="w-8 h-8 text-white" />,
+      };
+    } else if (categorieLower.includes('terminé')) {
       return {
         color: 'bg-purple-500',
-        icon: <FileText className="w-8 h-8 text-white" />,
-        label: 'Autres Infractions'
+        icon: <CheckCircle className="w-8 h-8 text-white" />,
       };
     } else {
       return {
         color: 'bg-gray-500',
         icon: <AlertCircle className="w-8 h-8 text-white" />,
-        label: categorie
       };
     }
   };
 
-  // Fonctions de gestion du formulaire
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value: inputValue } = e.target;
-    const value = ['X_coord', 'Y_coord', 'montant'].includes(name) ? parseFloat(inputValue) || 0 : inputValue;
-    setFormData({ ...formData, [name]: value });
-  };
+ 
 
   const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value: inputValue } = e.target;
@@ -242,72 +236,6 @@ const FieldActionsMap: React.FC = () => {
       ? parseFloat(inputValue) || 0 
       : inputValue;
     setEditFormData({ ...editFormData, [name]: value });
-  };
-
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      actions: checked 
-        ? [...prev.actions, name] 
-        : prev.actions.filter(action => action !== name)
-    }));
-  };
-
-  const handleRadioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, modelePV: e.target.value });
-  };
-
-  const handlePolygonCreated = (e: any) => {
-    const layer = e.layer;
-    const latlngs = layer.getLatLngs()[0].map((p: any) => [p.lng, p.lat]);
-    const polygon = turf.polygon([[...latlngs, latlngs[0]]]);
-    const area = turf.area(polygon);
-    setFormData({ ...formData, polygonCoords: latlngs, superficie: area });
-
-    if (featureGroupRef.current) {
-      featureGroupRef.current.eachLayer((l: any) => {
-        if (l !== layer) featureGroupRef.current.removeLayer(l);
-      });
-    }
-  };
-
-  const handleMapClick = (latlng: L.LatLng) => {
-    console.log("Clic sur la carte:", latlng);
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setSearchCoords(prev => ({ ...prev, [name]: value }));
-    setSearchError("");
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const x = parseFloat(searchCoords.x);
-    const y = parseFloat(searchCoords.y);
-    if (isNaN(x) || isNaN(y)) {
-      setSearchError("Veuillez entrer des coordonnées valides");
-      return;
-    }
-    if (mapRef.current) mapRef.current.setView([x, y], 15);
-  };
-
-  // Réinitialiser le formulaire
-  const resetForm = () => {
-    setFormData(initialFormData);
-    if (featureGroupRef.current) {
-      featureGroupRef.current.clearLayers();
-    }
-  };
-
-  // Gestion de la soumission du formulaire (CORRIGÉ)
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    console.log("💾 Soumission du formulaire:", formData);
-    alert("Formulaire soumis avec succès (voir console pour les données) !");
-    resetForm(); 
-    setShowForm(false); 
   };
 
   // Fonction pour ouvrir le modal d'édition
@@ -409,22 +337,22 @@ const FieldActionsMap: React.FC = () => {
     return new Intl.NumberFormat('fr-FR').format(amount) + ' Ar';
   };
 
-  const getStatusColor = (actions: string) => {
-    if (!actions) return 'bg-slate-100 text-slate-700';
-    const actionsLower = String(actions).toLowerCase();
+  // const getStatusColor = (actions: string) => {
+  //   if (!actions) return 'bg-slate-100 text-slate-700';
+  //   const actionsLower = String(actions).toLowerCase();
     
-    if (actionsLower.includes('résolu') || actionsLower.includes('resolu')) {
-      return 'bg-green-100 text-green-700';
-    } else if (actionsLower.includes('en cours')) {
-      return 'bg-blue-100 text-blue-700';
-    } else if (actionsLower.includes('en attente')) {
-      return 'bg-yellow-100 text-yellow-700';
-    } else if (actionsLower.includes('urgent')) {
-      return 'bg-red-100 text-red-700';
-    } else {
-      return 'bg-slate-100 text-slate-700';
-    }
-  };
+  //   if (actionsLower.includes('résolu') || actionsLower.includes('resolu')) {
+  //     return 'bg-green-100 text-green-700';
+  //   } else if (actionsLower.includes('en cours')) {
+  //     return 'bg-blue-100 text-blue-700';
+  //   } else if (actionsLower.includes('en attente')) {
+  //     return 'bg-yellow-100 text-yellow-700';
+  //   } else if (actionsLower.includes('urgent')) {
+  //     return 'bg-red-100 text-red-700';
+  //   } else {
+  //     return 'bg-slate-100 text-slate-700';
+  //   }
+  // };
 
   // Filtrage et pagination
   const filteredDescentes = listeDescentes.filter(descente => {
@@ -452,440 +380,189 @@ const FieldActionsMap: React.FC = () => {
     setShowModal(true);
   };
 
-  // Fonction pour centrer la carte sur les coordonnées de la descente
-  const focusOnMap = (descente: Descente) => {
-    if (mapRef.current && descente.x_coord && descente.y_coord) {
-      mapRef.current.setView([descente.x_coord, descente.y_coord], 15);
-    }
-  };
-
   return (
     <div className="space-y-6 min-h-screen p-6 bg-gray-50">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Descentes sur le terrain</h1>
-          <p className="text-gray-600 mt-1">Suivi des descentes et infractions constatées</p>
-        </div>
-        <button
-          onClick={() => {
-            setShowForm(!showForm);
-            if (!showForm) {
-              resetForm();
-            }
-          }}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{showForm ? 'Masquer le formulaire' : 'Nouvelle descente'}</span>
-        </button>
-      </div>
+   
 
       {/* Statistiques par catégorie */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {loadingStats ? (
-          Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="h-4 bg-gray-200 rounded w-24 mb-2 animate-pulse"></div>
-                  <div className="h-6 bg-gray-200 rounded w-16 mb-1 animate-pulse"></div>
-                  <div className="h-3 bg-gray-200 rounded w-20 animate-pulse"></div>
-                </div>
-                <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
-              </div>
-            </div>
-          ))
-        ) : infractionStats.length > 0 ? (
-          infractionStats.map((stat: any) => {
-            const style = getCategoryStyle(stat.categorie_consolidee);
-            return (
-              <div key={stat.categorie_consolidee} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm font-medium">
-                      {stat.categorie_consolidee}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
-                      {stat.nombre_de_terrains}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">terrains concernés</p>
-                  </div>
-                  <div className={`p-3 rounded-full ${style.color}`}>
-                    {style.icon}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="col-span-4 text-center py-8">
-            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500">Aucune donnée d'infraction disponible</p>
-          </div>
-        )}
+      
+
+      {/* Section Rendez-vous et Tableau en colonne */}
+      <div className="flex flex-col gap-6">
+        <div>
+         <RendezvousComponent rendezvous={rendezvous} onRendezvousUpdate={setRendezvous}/>
+        </div>
+   {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Listes des descentes</h1>
+          <p className="text-gray-600 mt-1">Suivi des descentes et infractions constatées</p>
+        </div>
       </div>
-
-      {/* Formulaire de nouvelle descente */}
-      {showForm && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-800 mb-6">Nouvelle Action</h2>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Actions et Modèle PV */}
-            <div className="flex flex-col md:flex-row md:space-x-8 space-y-4 md:space-y-0">
-              <div>
-                <p className="text-sm font-medium text-slate-700 mb-2">Actions</p>
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
-                    <input type="checkbox" name="depotPv" checked={formData.actions.includes("depotPv")} onChange={handleCheckboxChange} className="form-checkbox text-blue-500 rounded" />
-                    <span>Dépôt PV</span>
-                  </label>
-                  <label className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
-                    <input type="checkbox" name="arretInteractif" checked={formData.actions.includes("arretInteractif")} onChange={handleCheckboxChange} className="form-checkbox text-blue-500 rounded" />
-                    <span>Arrêt interactif des travaux</span>
-                  </label>
-                  <label className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
-                    <input type="checkbox" name="nonRespect" checked={formData.actions.includes("nonRespect")} onChange={handleCheckboxChange} className="form-checkbox text-blue-500 rounded" />
-                    <span>Non-respect de l'arrêt interactif</span>
-                  </label>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700 mb-2">Modèle PV</p>
-                <div className="flex space-x-4">
-                  <label className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
-                    <input type="radio" name="modelePV" value="PAT" checked={formData.modelePV === "PAT"} onChange={handleRadioChange} className="form-radio text-blue-500" />
-                    <span>PAT</span>
-                  </label>
-                  <label className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer">
-                    <input type="radio" name="modelePV" value="FIFAFI" checked={formData.modelePV === "FIFAFI"} onChange={handleRadioChange} className="form-radio text-blue-500" />
-                    <span>FIFAFI</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Inputs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Propriétaire</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="text" name="proprietaire" placeholder="Propriétaire" value={formData.proprietaire} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Commune</label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="text" name="commune" placeholder="Commune" value={formData.commune} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Fokontany</label>
-                <div className="relative">
-                  <Home className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="text" name="fokontany" placeholder="Fokontany" value={formData.fokontany} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Localisation</label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="text" name="localisation" placeholder="Localisation" value={formData.localisation} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Identification du terrain</label>
-                <div className="relative">
-                  <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="text" name="identification" placeholder="Identification du terrain" value={formData.identification} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Destination</label>
-                <div className="relative">
-                  <ArrowRight className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="text" name="destination" placeholder="Destination" value={formData.destination} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Coordonnée X (Latitude)</label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="number" step="any" name="X_coord" placeholder="Coordonnée X (Latitude)" value={formData.X_coord === 0 ? "" : formData.X_coord} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Coordonnée Y (Longitude)</label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="number" step="any" name="Y_coord" placeholder="Coordonnée Y (Longitude)" value={formData.Y_coord === 0 ? "" : formData.Y_coord} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Montant amende (Ar)</label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="number" name="montant" placeholder="Montant amende (Ar)" value={formData.montant === 0 ? "" : formData.montant} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Situation</label>
-                <div className="relative">
-                  <AlertTriangle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                  <input type="text" name="situation" placeholder="Situation" value={formData.situation} onChange={handleInputChange} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Infractions constatées</label>
-              <div className="relative">
-                <AlertTriangle className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
-                <textarea name="infraction" placeholder="Infractions constatées" value={formData.infraction} onChange={handleInputChange} rows={3} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-              </div>
-            </div>
-
-            {/* Carte */}
-            <div className="bg-slate-50 p-4 rounded-lg shadow-inner">
-              <h3 className="text-lg font-medium text-slate-700 mb-4">Délimitation du terrain sur la carte</h3>
-              <div className="h-[60vh] relative mb-4 rounded-lg overflow-hidden">
-                <MapContainer
-                  center={[-18.8792, 47.5079]}
-                  zoom={13}
-                  minZoom={3}
-                  maxZoom={22}
-                  scrollWheelZoom={true}
-                  style={{ height: "100%", width: "100%" }}
-                  ref={mapRef}
-                >
-                  <MapClickHandler onMapClick={handleMapClick} />
-                  <LayersControl position="topright">
-                    <LayersControl.BaseLayer checked name="OpenStreetMap">
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} />
-                    </LayersControl.BaseLayer>
-                    <LayersControl.BaseLayer name="Satellite">
-                      <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" maxZoom={22} />
-                    </LayersControl.BaseLayer>
-                  </LayersControl>
-                  <FeatureGroup ref={featureGroupRef}>
-                    <EditControl
-                      position="topright"
-                      onCreated={handlePolygonCreated}
-                      draw={{ rectangle: false, circle: false, marker: false, circlemarker: false, polyline: false }}
+        {/* Tableau des descentes */}
+        <div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            {/* Recherche et Filtres */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher par commune, localité ou identification..."
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="pl-10 pr-4 py-2 w-80 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
-                  </FeatureGroup>
-                </MapContainer>
-
-                {/* Recherche */}
-                <div className="absolute top-3 left-3 z-[1000] p-3 bg-white rounded-lg shadow-md border border-slate-200">
-                  <p className="text-xs font-semibold text-slate-700 mb-2 text-center">Recherche par coordonnées</p>
-                  <form onSubmit={handleSearchSubmit} className="flex gap-2">
-                    <input type="text" name="x" placeholder="Lat" value={searchCoords.x} onChange={handleSearchChange} className="w-20 text-xs px-2 py-1 border border-slate-300 rounded-md focus:outline-none" />
-                    <input type="text" name="y" placeholder="Lon" value={searchCoords.y} onChange={handleSearchChange} className="w-20 text-xs px-2 py-1 border border-slate-300 rounded-md focus:outline-none" />
-                    <button type="submit" className="w-8 h-8 flex items-center justify-center bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
-                      <Search className="w-4 h-4" />
+                  </div>
+                </div>
+                
+                <div className="flex space-x-1">
+                  {[
+                    { key: 'all', label: 'Toutes' },
+                    { key: '', label: "Aujourd'hui" },
+                    { key: 'en cours', label: 'Ce mois ci' },
+                    // { key: 'résolu', label: 'Résolus' }
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => {
+                        setActiveTab(tab.key);
+                        setCurrentPage(1);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        activeTab === tab.key
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {tab.label}
                     </button>
-                  </form>
-                  {searchError && <p className="text-red-500 text-xs mt-1">{searchError}</p>}
+                  ))}
                 </div>
-              </div>
-
-              {/* Superficie */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Superficie (m²)</label>
-                  <input type="text" placeholder="Superficie (m²)" value={formData.superficie.toFixed(2)} readOnly className="w-full px-4 py-2 bg-slate-200 text-slate-700 rounded-lg" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Superficie (ha)</label>
-                  <input type="text" placeholder="Superficie (ha)" value={(formData.superficie / 10000).toFixed(4)} readOnly className="w-full px-4 py-2 bg-slate-200 text-slate-700 rounded-lg" />
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">Matrice des coordonnées du polygone (lng, lat)</label>
-                <textarea value={formData.polygonCoords.length > 0 ? JSON.stringify(formData.polygonCoords, null, 2) : ""} readOnly rows={Math.max(3, formData.polygonCoords.length)} className="w-full px-4 py-2 bg-slate-200 text-slate-700 rounded-lg resize-none font-mono text-sm" />
               </div>
             </div>
 
-            {/* Boutons */}
-            <div className="flex space-x-4 pt-4 border-t border-slate-200 mt-6">
-              <button type="submit" className="flex-grow px-6 py-2 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition-colors">Enregistrer l'action</button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-                className="flex-grow px-6 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                Annuler
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Le reste du code reste inchangé... */}
-      {/* Recherche et Filtres */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher par commune, localité ou identification..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="pl-10 pr-4 py-2 w-80 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          
-          <div className="flex space-x-2">
-            {[
-              { key: 'all', label: 'Toutes' },
-              { key: '', label: 'En attente' },
-              { key: 'en cours', label: 'En cours' },
-              { key: 'résolu', label: 'Résolus' }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => {
-                  setActiveTab(tab.key);
-                  setCurrentPage(1);
-                }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === tab.key
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Tableau des descentes */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {isLoading ? (
-          <div className="text-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-2">Chargement des descentes...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center p-8">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-            <p className="text-red-600 font-medium">{error}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Réessayer
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Date</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Localité</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Coord X</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Coord Y</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Actions</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Infractions</th>
-                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Opérations</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {paginatedDescentes.length > 0 ? (
-                    paginatedDescentes.map((descente, index) => (
-                      <tr key={descente.identifica || `index-${index}`} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatDate(descente.date_desce)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{descente.localite || 'N/A'}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{descente.x_coord || 'N/A'}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{descente.y_coord || 'N/A'}</td>
-                        
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {descente.actions || 'Non spécifié'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryStyle(descente.infraction || '').color}`}>
-                            {descente.infraction || 'Non spécifié'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center space-x-2">
-                            <button
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              onClick={() => handleViewClick(descente)}
-                              title="Voir les détails"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button 
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Modifier"
-                              onClick={() => handleEditClick(descente)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
+            {/* Tableau avec taille de police réduite */}
+            {isLoading ? (
+              <div className="text-center p-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-gray-600 mt-2 text-sm">Chargement des descentes...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center p-6">
+                <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
+                <p className="text-red-600 font-medium text-sm">{error}</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="mt-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                >
+                  Réessayer
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wider">Date</th>
+                        <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wider">Localité</th>
+                        <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wider">Coord X</th>
+                        <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wider">Coord Y</th>
+                        <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wider">Actions</th>
+                        <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wider">Infractions</th>
+                        <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs uppercase tracking-wider">Opérations</th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="text-center py-8 text-gray-500">Aucune descente trouvée.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* Pagination simplifiée */}
-            {filteredDescentes.length > 0 && (
-              <div className="p-4 flex justify-between items-center border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  Affichage de {Math.min(startIndex + 1, filteredDescentes.length)} à {Math.min(startIndex + itemsPerPage, filteredDescentes.length)} sur {filteredDescentes.length} résultats
-                </p>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span>Précédent</span>
-                  </button>
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages || filteredDescentes.length === 0}
-                    className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <span>Suivant</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {paginatedDescentes.length > 0 ? (
+                        paginatedDescentes.map((descente, index) => (
+                          <tr key={descente.identifica || `index-${index}`} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-gray-900 text-xs">
+                                {formatDate(descente.date_desce)}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 text-xs">{descente.localite || 'N/A'}</td>
+                            <td className="px-4 py-3 font-medium text-gray-900 text-xs">{descente.x_coord || 'N/A'}</td>
+                            <td className="px-4 py-3 font-medium text-gray-900 text-xs">{descente.y_coord || 'N/A'}</td>
+                            
+                            <td className="px-4 py-3 text-gray-600 text-xs">
+                              <span className="line-clamp-2">
+                                {descente.actions || 'Non spécifié'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getCategoryStyle(descente.infraction || '').color}`}>
+                                {descente.infraction ? descente.infraction.substring(0, 20) + (descente.infraction.length > 20 ? '...' : '') : 'Non spécifié'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center space-x-1">
+                                <button
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                  onClick={() => handleViewClick(descente)}
+                                  title="Voir les détails"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                <button 
+                                  className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                  title="Modifier"
+                                  onClick={() => handleEditClick(descente)}
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="text-center py-6 text-gray-500 text-sm">
+                            Aucune descente trouvée.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+                
+                {/* Pagination simplifiée avec taille réduite */}
+                {filteredDescentes.length > 0 && (
+                  <div className="p-3 flex justify-between items-center border-t border-gray-200">
+                    <p className="text-gray-600 text-xs">
+                      Affichage de {Math.min(startIndex + 1, filteredDescentes.length)} à {Math.min(startIndex + itemsPerPage, filteredDescentes.length)} sur {filteredDescentes.length} résultats
+                    </p>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="flex items-center space-x-1 px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <span>Précédent</span>
+                      </button>
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages || filteredDescentes.length === 0}
+                        className="flex items-center space-x-1 px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs"
+                      >
+                        <span>Suivant</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* Modal de visualisation COMPLET */}
@@ -1105,7 +782,7 @@ const FieldActionsMap: React.FC = () => {
               {/* Section 4: Coordonnées détaillées */}
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
                 <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                  <Globe className="w-5 h-5 text-blue-600" />
+                  <MapPin className="w-5 h-5 text-blue-600" />
                   Coordonnées détaillées
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1122,20 +799,6 @@ const FieldActionsMap: React.FC = () => {
 
               <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200 mt-6">
                 <button
-                  onClick={() => {
-                    if (selectedDescente.x_coord && selectedDescente.y_coord) {
-                      focusOnMap(selectedDescente);
-                      setShowModal(false);
-                    }
-                  }}
-                  disabled={!selectedDescente.x_coord || !selectedDescente.y_coord}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Navigation className="w-4 h-4" />
-                  <span>Voir sur la carte</span>
-                </button>
-                
-                <button
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
                 >
@@ -1147,7 +810,7 @@ const FieldActionsMap: React.FC = () => {
         </div>
       )}
 
-      {/* Modal d'édition (adapté pour toutes les nouvelles propriétés) */}
+      {/* Modal d'édition */}
       {showEditModal && editingDescente && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[2000] flex justify-center items-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">

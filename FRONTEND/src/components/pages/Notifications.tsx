@@ -18,7 +18,11 @@ import {
   User,
   Calendar,
   Archive,
-  Download
+  Download,
+  MapPin,
+  Users,
+  Laptop,
+  Truck
 } from 'lucide-react';
 
 interface Notification {
@@ -32,6 +36,7 @@ interface Notification {
   dateExpiration?: string;
   emetteur: string;
   destinataire: string;
+  category: 'descente_terrain' | 'rendez_vous' | 'demande_pc' | 'autorisation_camion' | 'autre';
   actions?: {
     label: string;
     action: string;
@@ -41,18 +46,19 @@ interface Notification {
 const mockNotifications: Notification[] = [
   {
     id: 1,
-    titre: 'Nouvelle demande de remblai urgente',
-    message: 'Une nouvelle demande de remblai priorité urgente vient d\'être soumise par BTP Rasoanaivo pour un projet de construction d\'immeuble résidentiel.',
-    type: 'warning',
-    priority: 'urgent',
+    titre: 'Nouvelle descente sur terrain programmée',
+    message: 'Une descente sur terrain est prévue pour le 25 mars 2024 au site d\'Ambohipo pour inspection des travaux.',
+    type: 'info',
+    priority: 'high',
     status: 'unread',
     dateCreation: '2024-03-20T10:30:00',
     dateExpiration: '2024-03-25T23:59:59',
-    emetteur: 'Système APIPA',
-    destinataire: 'Équipe de validation',
+    emetteur: 'Service Terrain',
+    destinataire: 'Équipe d\'inspection',
+    category: 'descente_terrain',
     actions: [
-      { label: 'Examiner', action: 'review' },
-      { label: 'Approuver', action: 'approve' }
+      { label: 'Confirmer', action: 'confirm' },
+      { label: 'Reporter', action: 'postpone' }
     ]
   },
   {
@@ -64,49 +70,53 @@ const mockNotifications: Notification[] = [
     status: 'unread',
     dateCreation: '2024-03-20T09:15:00',
     emetteur: 'Service Autorisation',
-    destinataire: 'Transport Rakoto SARL'
+    destinataire: 'Transport Rakoto SARL',
+    category: 'autorisation_camion'
   },
   {
     id: 3,
-    titre: 'Action sur terrain complétée',
-    message: 'L\'action TER-001-2024 à Ambohipo a été marquée comme terminée. Le rapport final est disponible.',
+    titre: 'Rapport de descente terrain complété',
+    message: 'Le rapport de la descente TER-001-2024 à Ambohipo a été finalisé et validé.',
     type: 'success',
     priority: 'low',
     status: 'read',
     dateCreation: '2024-03-19T16:45:00',
     emetteur: 'Agent Rakoto',
-    destinataire: 'Superviseur terrain'
+    destinataire: 'Superviseur terrain',
+    category: 'descente_terrain'
   },
   {
     id: 4,
-    titre: 'Paiement en retard',
-    message: 'Le paiement pour l\'autorisation AUT-2024-012 est en retard de 5 jours. Contactez le propriétaire.',
-    type: 'error',
+    titre: 'Demande de PC en attente',
+    message: 'Une nouvelle demande de PC professionnel a été soumise par le service comptabilité.',
+    type: 'warning',
     priority: 'high',
     status: 'unread',
     dateCreation: '2024-03-19T14:20:00',
     dateExpiration: '2024-03-22T23:59:59',
-    emetteur: 'Service Comptabilité',
-    destinataire: 'Service Recouvrement',
+    emetteur: 'Service IT',
+    destinataire: 'Responsable équipement',
+    category: 'demande_pc',
     actions: [
-      { label: 'Contacter', action: 'contact' },
-      { label: 'Relancer', action: 'remind' }
+      { label: 'Traiter', action: 'process' },
+      { label: 'Rejeter', action: 'reject' }
     ]
   },
   {
     id: 5,
-    titre: 'Mise à jour système',
-    message: 'Une mise à jour de sécurité sera appliquée ce soir à 22h00. Le système sera indisponible pendant 30 minutes.',
+    titre: 'Rendez-vous client confirmé',
+    message: 'Le rendez-vous avec BTP Madagascar est confirmé pour demain à 14h00.',
     type: 'info',
     priority: 'medium',
     status: 'read',
     dateCreation: '2024-03-19T11:00:00',
-    emetteur: 'Administrateur Système',
-    destinataire: 'Tous les utilisateurs'
+    emetteur: 'Secrétariat',
+    destinataire: 'Commercial',
+    category: 'rendez_vous'
   },
   {
     id: 6,
-    titre: 'Autorisation expirée',
+    titre: 'Autorisation camion expirée',
     message: 'L\'autorisation AUT-2024-003 pour BTP Madagascar a expiré. Renouvelez ou archivez le dossier.',
     type: 'warning',
     priority: 'medium',
@@ -114,10 +124,35 @@ const mockNotifications: Notification[] = [
     dateCreation: '2024-03-19T08:30:00',
     emetteur: 'Système APIPA',
     destinataire: 'Service Autorisation',
+    category: 'autorisation_camion',
     actions: [
       { label: 'Renouveler', action: 'renew' },
       { label: 'Archiver', action: 'archive' }
     ]
+  },
+  {
+    id: 7,
+    titre: 'Demande PC approuvée',
+    message: 'La demande de PC pour le nouveau collaborateur a été approuvée. Livraison prévue sous 48h.',
+    type: 'success',
+    priority: 'medium',
+    status: 'read',
+    dateCreation: '2024-03-18T15:30:00',
+    emetteur: 'Service IT',
+    destinataire: 'Ressources Humaines',
+    category: 'demande_pc'
+  },
+  {
+    id: 8,
+    titre: 'Rendez-vous annulé',
+    message: 'Le rendez-vous avec Société Minière a été annulé. Une nouvelle date sera proposée.',
+    type: 'warning',
+    priority: 'low',
+    status: 'unread',
+    dateCreation: '2024-03-18T12:00:00',
+    emetteur: 'Secrétariat',
+    destinataire: 'Direction',
+    category: 'rendez_vous'
   }
 ];
 
@@ -126,8 +161,10 @@ export default function Notifications() {
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'info' | 'success' | 'warning' | 'error'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'urgent' | 'high' | 'medium' | 'low'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'descente_terrain' | 'rendez_vous' | 'demande_pc' | 'autorisation_camion' | 'autre'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNotifications, setSelectedNotifications] = useState<number[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['descente_terrain', 'rendez_vous', 'demande_pc', 'autorisation_camion']));
 
   const markAsRead = (id: number) => {
     setNotifications(prev => 
@@ -184,17 +221,39 @@ export default function Notifications() {
     setSelectedNotifications([]);
   };
 
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  };
+
   const filteredNotifications = notifications.filter(notif => {
     const matchesFilter = filter === 'all' || notif.status === filter;
     const matchesType = typeFilter === 'all' || notif.type === typeFilter;
     const matchesPriority = priorityFilter === 'all' || notif.priority === priorityFilter;
+    const matchesCategory = categoryFilter === 'all' || notif.category === categoryFilter;
     const matchesSearch = 
       notif.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       notif.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
       notif.emetteur.toLowerCase().includes(searchTerm.toLowerCase());
     
-    return matchesFilter && matchesType && matchesPriority && matchesSearch;
+    return matchesFilter && matchesType && matchesPriority && matchesCategory && matchesSearch;
   });
+
+  // Grouper les notifications par catégorie
+  const groupedNotifications = filteredNotifications.reduce((acc, notif) => {
+    if (!acc[notif.category]) {
+      acc[notif.category] = [];
+    }
+    acc[notif.category].push(notif);
+    return acc;
+  }, {} as Record<string, Notification[]>);
 
   const unreadCount = notifications.filter(notif => notif.status === 'unread').length;
 
@@ -215,6 +274,27 @@ export default function Notifications() {
       case 'warning': return 'bg-orange-500';
       case 'error': return 'bg-red-500';
       default: return 'bg-gray-500';
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'descente_terrain': return <MapPin className="w-5 h-5 text-blue-600" />;
+      case 'rendez_vous': return <Users className="w-5 h-5 text-green-600" />;
+      case 'demande_pc': return <Laptop className="w-5 h-5 text-purple-600" />;
+      case 'autorisation_camion': return <Truck className="w-5 h-5 text-orange-600" />;
+      default: return <Bell className="w-5 h-5 text-gray-600" />;
+    }
+  };
+
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'descente_terrain': return 'Descente sur terrain';
+      case 'rendez_vous': return 'Rendez-vous';
+      case 'demande_pc': return 'Demande PC';
+      case 'autorisation_camion': return 'Autorisation camion';
+      case 'autre': return 'Autre';
+      default: return category;
     }
   };
 
@@ -347,7 +427,7 @@ export default function Notifications() {
             </div>
           </div>
           
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as any)}
@@ -381,123 +461,177 @@ export default function Notifications() {
               <option value="medium">Moyenne</option>
               <option value="low">Faible</option>
             </select>
+
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as any)}
+              className="px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Toutes catégories</option>
+              <option value="descente_terrain">Descente terrain</option>
+              <option value="rendez_vous">Rendez-vous</option>
+              <option value="demande_pc">Demande PC</option>
+              <option value="autorisation_camion">Autorisation camion</option>
+              <option value="autre">Autre</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* Notifications List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="w-12 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedNotifications.length === filteredNotifications.length && filteredNotifications.length > 0}
-                    onChange={selectAllNotifications}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Notification</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Priorité</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Émetteur</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Date</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredNotifications.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center">
-                    <Bell className="mx-auto h-12 w-12 text-slate-400 mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900 mb-2">Aucune notification</h3>
-                    <p className="text-slate-500">
-                      {searchTerm || filter !== 'all' || typeFilter !== 'all' || priorityFilter !== 'all'
-                        ? 'Aucune notification ne correspond à vos critères.' 
-                        : 'Vous n\'avez aucune notification pour le moment.'}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filteredNotifications.map((notification) => (
-                  <tr key={notification.id} className={`hover:bg-slate-50 ${notification.status === 'unread' ? 'bg-blue-50' : ''}`}>
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedNotifications.includes(notification.id)}
-                        onChange={() => toggleSelectNotification(notification.id)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-start space-x-3">
-                        <div className={`p-2 rounded-lg ${getTypeColor(notification.type)}/10`}>
-                          {getTypeIcon(notification.type)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h4 className={`text-sm font-medium ${notification.status === 'unread' ? 'text-slate-900' : 'text-slate-700'}`}>
-                              {notification.titre}
-                            </h4>
-                            {notification.status === 'unread' && (
-                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                            )}
+      {/* Notifications List Grouped by Category */}
+      <div className="space-y-4">
+        {Object.entries(groupedNotifications).map(([category, categoryNotifications]) => (
+          <div key={category} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Category Header */}
+            <div 
+              className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors"
+              onClick={() => toggleCategory(category)}
+            >
+              <div className="flex items-center space-x-3">
+                {getCategoryIcon(category)}
+                <h3 className="text-lg font-semibold text-slate-800">
+                  {getCategoryLabel(category)}
+                </h3>
+                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                  {categoryNotifications.length} notification{categoryNotifications.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-slate-500">
+                  {expandedCategories.has(category) ? 'Réduire' : 'Développer'}
+                </span>
+                <div className={`transform transition-transform ${expandedCategories.has(category) ? 'rotate-180' : ''}`}>
+                  <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Category Notifications */}
+            {expandedCategories.has(category) && (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="w-12 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={categoryNotifications.every(notif => selectedNotifications.includes(notif.id))}
+                          onChange={() => {
+                            const allSelected = categoryNotifications.every(notif => selectedNotifications.includes(notif.id));
+                            if (allSelected) {
+                              setSelectedNotifications(prev => prev.filter(id => !categoryNotifications.some(notif => notif.id === id)));
+                            } else {
+                              setSelectedNotifications(prev => [
+                                ...prev,
+                                ...categoryNotifications.map(notif => notif.id).filter(id => !prev.includes(id))
+                              ]);
+                            }
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Notification</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Priorité</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Émetteur</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Date</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-slate-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {categoryNotifications.map((notification) => (
+                      <tr key={notification.id} className={`hover:bg-slate-50 ${notification.status === 'unread' ? 'bg-blue-50' : ''}`}>
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedNotifications.includes(notification.id)}
+                            onChange={() => toggleSelectNotification(notification.id)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-start space-x-3">
+                            <div className={`p-2 rounded-lg ${getTypeColor(notification.type)}/10`}>
+                              {getTypeIcon(notification.type)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <h4 className={`text-sm font-medium ${notification.status === 'unread' ? 'text-slate-900' : 'text-slate-700'}`}>
+                                  {notification.titre}
+                                </h4>
+                                {notification.status === 'unread' && (
+                                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                )}
+                              </div>
+                              <p className="text-sm text-slate-600 line-clamp-2">{notification.message}</p>
+                            </div>
                           </div>
-                          <p className="text-sm text-slate-600 line-clamp-2">{notification.message}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {getPriorityBadge(notification.priority)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      <div className="flex items-center space-x-2">
-                        <User className="w-4 h-4 text-slate-400" />
-                        <span>{notification.emetteur}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-slate-400" />
-                        <span>{formatDateTime(notification.dateCreation)}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center space-x-2">
-                        {notification.status === 'unread' ? (
-                          <button
-                            onClick={() => markAsRead(notification.id)}
-                            className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                            title="Marquer comme lu"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => markAsUnread(notification.id)}
-                            className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
-                            title="Marquer comme non lu"
-                          >
-                            <EyeOff className="w-4 h-4" />
-                          </button>
-                        )}
-                        
-                        <button
-                          onClick={() => deleteNotification(notification.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {getPriorityBadge(notification.priority)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">
+                          <div className="flex items-center space-x-2">
+                            <User className="w-4 h-4 text-slate-400" />
+                            <span>{notification.emetteur}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="w-4 h-4 text-slate-400" />
+                            <span>{formatDateTime(notification.dateCreation)}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center space-x-2">
+                            {notification.status === 'unread' ? (
+                              <button
+                                onClick={() => markAsRead(notification.id)}
+                                className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                                title="Marquer comme lu"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => markAsUnread(notification.id)}
+                                className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                                title="Marquer comme non lu"
+                              >
+                                <EyeOff className="w-4 h-4" />
+                              </button>
+                            )}
+                            
+                            <button
+                              onClick={() => deleteNotification(notification.id)}
+                              className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {Object.keys(groupedNotifications).length === 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+            <Bell className="mx-auto h-12 w-12 text-slate-400 mb-4" />
+            <h3 className="text-lg font-medium text-slate-900 mb-2">Aucune notification</h3>
+            <p className="text-slate-500">
+              {searchTerm || filter !== 'all' || typeFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all'
+                ? 'Aucune notification ne correspond à vos critères.' 
+                : 'Vous n\'avez aucune notification pour le moment.'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

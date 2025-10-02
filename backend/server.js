@@ -20,6 +20,7 @@ import demandePCRoutes from './routes/demandePCRoutes.js';
 import statsituationRoutes from "./routes/statsituationRoutes.js";
 import statcommuneRoutes from "./routes/statcommuneRoutes.js"; 
 import statDescentesRoutes from './routes/statDescentesRoute.js'; 
+import nouvelleDescenteRoutes from "./routes/nouvelleDescenteRoutes.js";
 
 const app = express();
 const PORT = 3000;
@@ -39,16 +40,23 @@ app.use('/api/demandefn', demandeFnRoutes);
 app.use("/api/titresansnom", titresansnomRoutes);
 app.use('/api/autorisationcamion', truckRoutes);
 app.use('/api/prescriptions', prescriptionRoute);
-app.use('/api/descentes', decenteRoutes); 
+app.use('/api/descentes', decenteRoutes); // Anciennes descentes (GET)
+app.use('/api/nouvelle-descente', nouvelleDescenteRoutes); // ✅ NOUVEAU CHEMIN pour POST
 app.use('/api/infractions', infractionRoutes); 
 app.use('/api/demandepc', demandePCRoutes);
 app.use("/api", statsituationRoutes);
 app.use("/api", statcommuneRoutes);
-app.use('/api/stat-descentes', statDescentesRoutes); // route pour les stats des descentes
+app.use('/api/stat-descentes', statDescentesRoutes);
 
 // Simple home page
 app.get("/", (req, res) => {
   res.send("✅ Serveur Express fonctionne !");
+});
+
+// Middleware de logging pour debug
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path}`, req.body);
+  next();
 });
 
 // Lancement du serveur
