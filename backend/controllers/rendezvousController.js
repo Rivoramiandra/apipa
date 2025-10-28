@@ -133,6 +133,117 @@ class RendezvousController {
       });
     }
   }
+  // Envoyer une mise en demeure
+  sendMiseEnDemeure = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nouvelle_date, nouvelle_heure } = req.body;
+
+      // Vérifier si le rendez-vous existe et est éligible
+      const eligibility = await RendezvousModel.isEligibleForMiseEnDemeure(id);
+      
+      if (!eligibility.rendezvous) {
+        return res.status(404).json({
+          success: false,
+          message: 'Rendez-vous non trouvé ou déjà traité'
+        });
+      }
+
+      if (!eligibility.eligible) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ce rendez-vous n\'est pas encore éligible pour une mise en demeure (7 jours requis après la date du rendez-vous)'
+        });
+      }
+
+      // Valider la nouvelle date si fournie
+      if (nouvelle_date) {
+        const newDate = new Date(nouvelle_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (newDate < today) {
+          return res.status(400).json({
+            success: false,
+            message: 'La nouvelle date de rendez-vous ne peut pas être dans le passé'
+          });
+        }
+      }
+
+      // Envoyer la mise en demeure
+      const updated = await RendezvousModel.sendMiseEnDemeure(
+        id, 
+        nouvelle_date || null, 
+        nouvelle_heure || null
+      );
+
+      res.json({
+        success: true,
+        data: updated,
+        message: 'Mise en demeure envoyée avec succès. Le statut est maintenant "En cours".'
+      });
+    } catch (error) {
+      console.error('Erreur dans sendMiseEnDemeure:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de l\'envoi de la mise en demeure',
+        error: error.message
+      });
+    }
+  }
+
+  // Récupérer les rendez-vous éligibles pour mise en demeure
+  getEligibleForMiseEnDemeure = async (req, res) => {
+    try {
+      const eligibleRendezvous = await RendezvousModel.getRendezvousEligibleForMiseEnDemeure();
+      
+      res.json({
+        success: true,
+        data: eligibleRendezvous,
+        count: eligibleRendezvous.length
+      });
+    } catch (error) {
+      console.error('Erreur dans getEligibleForMiseEnDemeure:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la récupération des rendez-vous éligibles',
+        error: error.message
+      });
+    }
+  }
+
+  // Vérifier l'éligibilité d'un rendez-vous spécifique
+  checkEligibility = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const eligibility = await RendezvousModel.isEligibleForMiseEnDemeure(id);
+      
+      if (!eligibility.rendezvous) {
+        return res.status(404).json({
+          success: false,
+          message: 'Rendez-vous non trouvé'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          eligible: eligibility.eligible,
+          rendezvous: eligibility.rendezvous,
+          message: eligibility.eligible 
+            ? 'Rendez-vous éligible pour mise en demeure' 
+            : 'Rendez-vous non éligible (7 jours requis après la date du rendez-vous)'
+        }
+      });
+    } catch (error) {
+      console.error('Erreur dans checkEligibility:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la vérification d\'éligibilité',
+        error: error.message
+      });
+    }
+  }
 }
 
 export default new RendezvousController;

@@ -4,19 +4,8 @@ class DescenteModel {
   async getAllAsGeoJSON() {
     try {
       const query = `
-        SELECT 
-          date_desce,
-          actions,
-          actions_su,
-          commune,
-          localisati AS localite,
-          identifica,
-          x_coord,
-          y_coord,
-          superficie,
-          infraction
-        FROM public.depuisavril
-        ORDER BY date_desce DESC;
+       SELECT * FROM public.depuisavril
+
       `;
       const { rows } = await pool.query(query);
       return rows;

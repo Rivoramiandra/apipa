@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Car, Lock, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, User } from 'lucide-react';
 
 interface LoginPageProps {
   onLogin: (success: boolean) => void;
@@ -9,20 +9,35 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     setTimeout(() => {
-      if (email === 'admin@example.com' && password === 'admin123') {
-        onLogin(true);
+      if (email !== 'admin@example.com') {
+        setErrorMessage('Email invalid');
+        setIsLoading(false);
+      } else if (password !== 'admin123') {
+        setErrorMessage('Mot de passe invalid');
+        setIsLoading(false);
       } else {
-        alert('Identifiants incorrects. Utilisez: admin@example.com / admin123');
+        setShowSuccessModal(true);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }, 1000);
   };
+
+  useEffect(() => {
+    if (showSuccessModal) {
+      const timer = setTimeout(() => {
+        onLogin(true);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessModal, onLogin]);
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
@@ -30,8 +45,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
           {/* Logo et Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500 rounded-full mb-4 shadow-md">
-              <Car className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 shadow-md overflow-hidden">
+              <img 
+                src="https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=100066615102365" 
+                alt="APIPA Logo" 
+                className="w-full h-full object-contain" 
+              />
             </div>
             <h2 className="text-3xl font-bold text-gray-800 mb-2">APIPA Admin</h2>
             <p className="text-gray-500">Connectez-vous à votre tableau de bord</p>
@@ -40,7 +59,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           {/* Formulaire */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-base font-medium text-gray-700 mb-2">
                 Email
               </label>
               <div className="relative">
@@ -57,7 +76,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-base font-medium text-gray-700 mb-2">
                 Mot de passe
               </label>
               <div className="relative">
@@ -82,14 +101,31 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </button>
           </form>
 
-          {/* Identifiants de démo */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
-            <p className="text-xs text-gray-700 mb-1 font-semibold">Identifiants de démonstration :</p>
-            <p className="text-xs text-gray-600">Email: admin@example.com</p>
-            <p className="text-xs text-gray-600">Mot de passe: admin123</p>
-          </div>
+     
         </div>
       </div>
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm w-full shadow-xl">
+            <h3 className="text-xl font-bold text-green-600 mb-4">Connexion réussie !</h3>
+            <p className="text-gray-600">Redirection vers le tableau de bord en cours...</p>
+          </div>
+        </div>
+      )}
+      {errorMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm w-full shadow-xl">
+            <h3 className="text-xl font-bold text-red-600 mb-4">Erreur de connexion</h3>
+            <p className="text-gray-600 mb-4">{errorMessage}</p>
+            <button 
+              onClick={() => setErrorMessage('')}
+              className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-600 transition-all"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

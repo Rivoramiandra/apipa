@@ -9,8 +9,9 @@ import {
   Menu,
   ChevronLeft,
   LogOut,
-  User,
-  FileText
+  FileText,
+  ClipboardList,
+  CheckCircle
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,16 +25,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { id: 'cartography', label: 'Cartographie', icon: Map },
-    { id: 'descente', label: 'Descente sur Terrain', icon:  MapPin},
-    { id: 'rendezvous', label: 'Rendez-vous', icon:Package  },
+    { id: 'descente', label: 'Rapport de descente', icon: MapPin },
+    { id: 'rendezvous', label: 'Faire F.T', icon: ClipboardList  },
+    { id: 'ft', label: 'Listes F.T', icon: ClipboardList }, // ✅ Added
+    { id: 'avisdepayement', label: 'Faire A.P', icon: CheckCircle },
     { id: 'pc-request', label: 'Demande PC - Permis de construction', icon: FileText },
     { id: 'truck-authorization', label: 'Autorisation Camion', icon: Car },
-    // ❌ Notification retirée du menu principal
   ];
 
   return (
     <>
-      {/* Overlay mobile */}
       {!collapsed && (
         <div 
           className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40" 
@@ -41,7 +42,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
         />
       )}
 
-      {/* Sidebar */}
       <aside className={`
         fixed lg:relative z-50 h-screen transition-all duration-300 ease-in-out
         bg-gradient-to-b from-slate-900 to-slate-800 border-r border-slate-700/50
@@ -77,24 +77,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
             </button>
           </div>
 
-          {/* User Profile (visible only when expanded) */}
-          {!collapsed && (
-            <div className="p-3 sm:p-4 border-b border-slate-700/30">
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="relative">
-                  <div className="w-8 sm:w-10 h-8 sm:h-10 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center shadow-md">
-                    <User className="w-4 sm:w-5 h-4 sm:h-5 text-white" />
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 w-2 sm:w-3 h-2 sm:h-3 bg-green-400 rounded-full border-2 border-slate-900"></div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-medium text-xs sm:text-sm truncate">John Doe</p>
-                  <p className="text-slate-400 text-[10px] sm:text-xs truncate">Administrateur</p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Menu */}
           <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
             {!collapsed && (
@@ -125,7 +107,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
                       rounded-xl overflow-hidden
                     `}
                   >
-                    {/* Active indicator */}
                     {isActive && (
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 to-purple-500 rounded-l"></div>
                     )}
@@ -137,10 +118,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
                           {item.label}
                         </span>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg -m-2"></div>
                     </div>
 
-                    {/* Tooltip for collapsed state */}
+                    {/* Tooltip */}
                     {collapsed && (
                       <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
                         {item.label}
@@ -155,7 +135,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
           {/* Footer */}
           <div className="p-3 sm:p-4 border-t border-slate-700/50">
             <div className={`space-y-1 sm:space-y-2 ${collapsed ? 'flex flex-col items-center' : ''}`}>
-              {/* ✅ Notification déplacée dans le footer avec badge 5 */}
+              {/* ✅ Notification maintained */}
               <button 
                 onClick={() => {
                   setActiveSection('notifications');
@@ -173,7 +153,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
               >
                 <div className="relative">
                   <Bell className="w-4 sm:w-5 h-4 sm:h-5 text-slate-400 group-hover:text-white" />
-                  {/* ✅ Badge 5 */}
                   <span className="absolute -top-1 -right-1 w-3 sm:w-4 h-3 sm:h-4 bg-red-500 rounded-full text-[10px] sm:text-xs flex items-center justify-center text-white">
                     5
                   </span>
@@ -182,7 +161,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
                 {!collapsed && (
                   <>
                     <span className="ml-2 sm:ml-3 font-medium text-xs sm:text-base">Notification</span>
-                    {/* ✅ Badge supplémentaire pour l'état étendu */}
                     <span className="ml-auto inline-flex items-center justify-center px-1 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-white bg-red-500 rounded-full min-w-[1rem] sm:min-w-[1.5rem]">
                       5
                     </span>
@@ -199,14 +177,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
                 {!collapsed && <span className="ml-2 sm:ml-3 font-medium text-xs sm:text-base">Déconnexion</span>}
               </button>
             </div>
-            
-            {!collapsed && (
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-700/30">
-                <p className="text-[10px] sm:text-xs text-slate-500 text-center">
-                  Version 1.0.0
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </aside>

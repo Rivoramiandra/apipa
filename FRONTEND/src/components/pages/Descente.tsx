@@ -3,8 +3,59 @@ import axios from 'axios';
 import { 
   Plus, Search, User, MapPin, Home, Tag,  
   AlertTriangle, Globe, Eye, Clock, CheckCircle, AlertCircle, 
-  X, ChevronLeft, ChevronRight, Calendar, FileText
+  X, ChevronLeft, ChevronRight, Calendar, FileText, Phone
 } from 'lucide-react';
+
+// Composant Toast
+interface ToastProps {
+  message: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  onClose: () => void;
+}
+
+const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getBackgroundColor = () => {
+    switch (type) {
+      case 'success': return 'bg-green-500';
+      case 'error': return 'bg-red-500';
+      case 'warning': return 'bg-yellow-500';
+      case 'info': return 'bg-blue-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success': return <CheckCircle className="w-5 h-5" />;
+      case 'error': return <AlertCircle className="w-5 h-5" />;
+      case 'warning': return <AlertTriangle className="w-5 h-5" />;
+      case 'info': return <Info className="w-5 h-5" />;
+      default: return <Info className="w-5 h-5" />;
+    }
+  };
+
+  return (
+    <div className={`fixed top-4 right-4 ${getBackgroundColor()} text-white p-4 rounded-lg shadow-lg flex items-center space-x-3 min-w-80 z-[9999] animate-in slide-in-from-right-full`}>
+      {getIcon()}
+      <span className="flex-1">{message}</span>
+      <button onClick={onClose} className="text-white hover:text-gray-200">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+
+// Composant Info pour les toasts
+const Info = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
 
 interface Descente {
   date_desce: Date;
@@ -12,16 +63,16 @@ interface Descente {
   n_pv_pat: string;
   n_fifafi: string;
   actions_su: string;
-  proprietaire: string;
+  proprietai: string;
   commune: string;
-  localite: string;
+  localisati: string;
   identifica: string;
   x_coord: number;
   y_coord: number;
   x_long: number;
   y_lat: number;
   superficie: number;
-  destination: string;
+  destinatio: string;
   montant: number;
   infraction: string;
   suite_a_do: string;
@@ -33,22 +84,35 @@ interface Descente {
   Montant_1: number;
   Montant_2: number;
   reference: string;
-  observation: string;
+  observatio: string;
   situation: string;
   situatio_1: string;
+  heure_descente: string;
+  date_rendez_vous: string;
+  heure_rendez_vous: string;
+  type_verbalisateur: string;
+  nom_verbalisateur: string;
+  nom_personne_r: string;
+  fokontany: string;
+  modele_pv: string;
+  contact_r: string;
+  adresse_r: string;
+  dossier_a_fournir: string[];
 }
 
-// Définition de l'état initial du formulaire
 const initialFormData = {
   dateDescente: "",
   heureDescente: "",
   dateRendezVous: "",
   heureRendezVous: "",
   numeroPV: "",
+  reference: "",
   typeVerbalisateur: "",
   nomVerbalisateur: "",
   personneR: "",
   nomPersonneR: "",
+  contactR: "",
+  adresseR: "",
   commune: "",
   fokontany: "",
   localite: "",
@@ -56,10 +120,10 @@ const initialFormData = {
   Y_coord: 0,
   infraction: "",
   actions: [] as string[],
+  dossierAFournir: [] as string[],
   modelePV: "PAT",
 };
 
-// Fonction pour récupérer les statistiques d'infractions
 const fetchInfractionStats = async () => {
   try {
     const response = await axios.get("http://localhost:3000/api/infractions/categories");
@@ -70,7 +134,6 @@ const fetchInfractionStats = async () => {
   }
 };
 
-// Fonction pour enregistrer une nouvelle descente
 const saveDescente = async (descenteData: any) => {
   try {
     console.log("📤 Envoi des données au serveur:", descenteData);
@@ -111,9 +174,41 @@ const FieldActionsComponent: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: 'success' | 'error' | 'warning' | 'info' }>>([]);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const itemsPerPage = 10;
 
-  // Chargement des données de descente
+  const dossierOptions = ['CSJ', 'Plan off', "PU (Permis d'Utilisation)", 'Permis de Construction', 'Permis de Remblais'];
+
+  // Fonction pour ajouter un toast
+  const addToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+  };
+
+  // Fonction pour supprimer un toast
+  const removeToast = (id: number) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
+  // Fonction pour ouvrir le modal de confirmation
+  const openConfirmationModal = () => {
+    // Validation des champs obligatoires
+    if (!formData.dateDescente || !formData.heureDescente || !formData.numeroPV || 
+        !formData.typeVerbalisateur || !formData.nomVerbalisateur || !formData.commune || 
+        !formData.fokontany || !formData.localite || !formData.infraction) {
+      addToast("Veuillez remplir tous les champs obligatoires", 'warning');
+      return;
+    }
+    setShowConfirmationModal(true);
+  };
+
+  // Fonction pour confirmer l'enregistrement
+  const confirmSubmit = async () => {
+    setShowConfirmationModal(false);
+    await handleSubmit();
+  };
+
   useEffect(() => {
     const fetchDescentes = async () => {
       try {
@@ -124,7 +219,6 @@ const FieldActionsComponent: React.FC = () => {
 
         let data = response.data;
 
-        // Normalisation des données
         if (!Array.isArray(data)) {
           console.warn("⚠️ La réponse n'est pas un tableau, tentative de conversion...");
           if (data && typeof data === 'object') {
@@ -136,22 +230,56 @@ const FieldActionsComponent: React.FC = () => {
         }
 
         if (Array.isArray(data)) {
-          // Tri par date décroissante pour afficher les nouvelles descentes en premier
-          const parsedData = data.map(d => ({
-            ...d,
-            x_coord: Number(d.x_coord),
-            y_coord: Number(d.y_coord),
-            x_long: Number(d.x_long),
-            y_lat: Number(d.y_lat),
-            superficie: Number(d.superficie),
-            montant: Number(d.montant),
-            amende_reg: Number(d.amende_reg),
-            Montant_1: Number(d.Montant_1),
-            Montant_2: Number(d.Montant_2),
-          })).sort((a, b) => new Date(b.date_desce).getTime() - new Date(a.date_desce).getTime());
+          const parsedData = data.map(d => {
+            // Gestion spéciale pour dossier_a_fournir qui peut être un string ou array
+            let dossierArray: string[] = [];
+            if (Array.isArray(d.dossier_a_fournir)) {
+              dossierArray = d.dossier_a_fournir;
+            } else if (typeof d.dossier_a_fournir === 'string' && d.dossier_a_fournir.trim() !== '') {
+              try {
+                // Essayer de parser comme JSON
+                dossierArray = JSON.parse(d.dossier_a_fournir);
+              } catch {
+                // Si ce n'est pas du JSON, traiter comme une chaîne simple
+                dossierArray = [d.dossier_a_fournir];
+              }
+            }
+
+            return {
+              ...d,
+              x_coord: Number(d.x_coord) || 0,
+              y_coord: Number(d.y_coord) || 0,
+              x_long: Number(d.x_long) || 0,
+              y_lat: Number(d.y_lat) || 0,
+              superficie: Number(d.superficie) || 0,
+              montant: Number(d.montant) || 0,
+              amende_reg: Number(d.amende_reg) || 0,
+              Montant_1: Number(d.Montant_1) || 0,
+              Montant_2: Number(d.Montant_2) || 0,
+              heure_descente: d.heure_descente || '',
+              date_rendez_vous: d.date_rendez_vous || '',
+              heure_rendez_vous: d.heure_rendez_vous || '',
+              type_verbalisateur: d.type_verbalisateur || '',
+              nom_verbalisateur: d.nom_verbalisateur || '',
+              nom_personne_r: d.nom_personne_r || d.proprietai || '',
+              fokontany: d.fokontany || '',
+              modele_pv: d.modele_pv || '',
+              contact_r: d.contact_r || '',
+              adresse_r: d.adresse_r || '',
+              dossier_a_fournir: dossierArray,
+              // Assurer que les champs texte ne soient pas null
+              commune: d.commune || '',
+              localisati: d.localisati || '',
+              infraction: d.infraction || '',
+              reference: d.reference || '',
+              personne_r: d.personne_r || '',
+              actions: d.actions || ''
+            };
+          }).sort((a, b) => new Date(b.date_desce).getTime() - new Date(a.date_desce).getTime());
           
           setListeDescentes(parsedData);
           console.log(`✅ ${parsedData.length} descentes chargées avec succès`);
+          console.log("📊 Exemple de données parsées:", parsedData[0]);
         } else {
           throw new Error("Format de données invalide");
         }
@@ -170,6 +298,7 @@ const FieldActionsComponent: React.FC = () => {
 
         setError(errorMessage);
         setListeDescentes([]);
+        addToast(errorMessage, 'error');
       } finally {
         setIsLoading(false);
       }
@@ -178,7 +307,6 @@ const FieldActionsComponent: React.FC = () => {
     fetchDescentes();
   }, []);
 
-  // Chargement des statistiques d'infractions
   useEffect(() => {
     const loadInfractionStats = async () => {
       try {
@@ -195,7 +323,6 @@ const FieldActionsComponent: React.FC = () => {
     loadInfractionStats();
   }, []);
 
-  // Fonction pour obtenir l'icône et la couleur selon la catégorie
   const getCategoryStyle = (categorie: string) => {
     const categorieLower = categorie.toLowerCase();
     
@@ -232,7 +359,6 @@ const FieldActionsComponent: React.FC = () => {
     }
   };
 
-  // Fonctions de gestion du formulaire
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value: inputValue } = e.target;
     const value = ['X_coord', 'Y_coord'].includes(name) ? parseFloat(inputValue) || 0 : inputValue;
@@ -249,75 +375,70 @@ const FieldActionsComponent: React.FC = () => {
     }));
   };
 
+  const handleDossierCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      dossierAFournir: checked 
+        ? [...prev.dossierAFournir, value] 
+        : prev.dossierAFournir.filter(dossier => dossier !== value)
+    }));
+  };
+
   const handleRadioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, modelePV: e.target.value });
   };
 
-  // Réinitialiser le formulaire
   const resetForm = () => {
     setFormData(initialFormData);
   };
 
-  // Gestion de la soumission du formulaire AVEC ENREGISTREMENT API
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    
-    // Validation des champs requis
-    if (!formData.dateDescente || !formData.heureDescente || !formData.numeroPV || 
-        !formData.typeVerbalisateur || !formData.nomVerbalisateur || !formData.commune || 
-        !formData.fokontany || !formData.localite || !formData.infraction) {
-      alert("Veuillez remplir tous les champs obligatoires");
-      return;
+  const handleSubmit = async (e?: React.FormEvent<HTMLFormElement>) => {
+    if (e) {
+      e.preventDefault();
     }
-
+    
     setIsSubmitting(true);
 
     try {
-      // Préparation des données pour l'API - CORRECTION DU PROBLÈME actions
       const descenteData = {
-        // Champs OBLIGATOIRES selon l'erreur
         dateDescente: new Date(formData.dateDescente).toISOString(),
         heureDescente: formData.heureDescente,
         numeroPV: formData.numeroPV,
+        reference: formData.reference,
         typeVerbalisateur: formData.typeVerbalisateur,
         nomVerbalisateur: formData.nomVerbalisateur,
         personneR: formData.personneR,
         nomPersonneR: formData.nomPersonneR,
+        contactR: formData.contactR,
+        adresseR: formData.adresseR,
         commune: formData.commune,
         fokontany: formData.fokontany,
         localite: formData.localite,
         infraction: formData.infraction,
-        
-        // Champs optionnels
+        dossierAFournir: formData.dossierAFournir,
         dateRendezVous: formData.dateRendezVous || "",
         heureRendezVous: formData.heureRendezVous || "",
         X_coord: formData.X_coord,
         Y_coord: formData.Y_coord,
-        // CORRECTION : Envoyer le tableau directement ou selon ce qu'attend le serveur
-        actions: formData.actions, // Envoyer le tableau directement
+        actions: formData.actions,
         modelePV: formData.modelePV,
-        
-        // Champs avec valeurs par défaut
-        identifica: `DESC_${Date.now()}`,
-        observation: `Rendez-vous: ${formData.dateRendezVous} ${formData.heureRendezVous}`,
       };
 
       console.log("💾 Données préparées pour l'API:", descenteData);
 
-      // Appel à l'API pour enregistrer
       const result = await saveDescente(descenteData);
       
       console.log("✅ Descente enregistrée avec succès:", result);
       
-      // Mettre à jour la liste locale avec les données formatées pour l'affichage
       const nouvelleDescentePourAffichage = {
         date_desce: new Date(formData.dateDescente),
-        actions: formData.actions.join(", "), // Ici on garde le join pour l'affichage
+        actions: formData.actions.join(", "),
         n_pv_pat: formData.modelePV === "PAT" ? formData.numeroPV : "",
         n_fifafi: formData.modelePV === "FIFAFI" ? formData.numeroPV : "",
-        proprietaire: formData.nomPersonneR,
+        proprietai: formData.nomPersonneR,
         commune: formData.commune,
-        localite: formData.localite,
+        localisati: formData.localite,
         identifica: `DESC_${Date.now()}`,
         x_coord: formData.X_coord,
         y_coord: formData.Y_coord,
@@ -325,10 +446,21 @@ const FieldActionsComponent: React.FC = () => {
         y_lat: formData.X_coord,
         personne_r: formData.personneR,
         infraction: formData.infraction,
-        // Champs par défaut pour l'affichage
+        reference: formData.reference,
+        heure_descente: formData.heureDescente,
+        date_rendez_vous: formData.dateRendezVous,
+        heure_rendez_vous: formData.heureRendezVous,
+        type_verbalisateur: formData.typeVerbalisateur,
+        nom_verbalisateur: formData.nomVerbalisateur,
+        nom_personne_r: formData.nomPersonneR,
+        fokontany: formData.fokontany,
+        modele_pv: formData.modelePV,
+        contact_r: formData.contactR,
+        adresse_r: formData.adresseR,
+        dossier_a_fournir: formData.dossierAFournir,
         actions_su: "",
         superficie: 0,
-        destination: "",
+        destinatio: "",
         montant: 0,
         suite_a_do: "",
         amende_reg: 0,
@@ -337,31 +469,26 @@ const FieldActionsComponent: React.FC = () => {
         recommanda: "",
         Montant_1: 0,
         Montant_2: 0,
-        reference: "",
-        observation: `Rendez-vous: ${formData.dateRendezVous} ${formData.heureRendezVous}`,
+        observatio: `Rendez-vous: ${formData.dateRendezVous} ${formData.heureRendezVous}`,
         situation: "",
         situatio_1: ""
       };
       
-      // Ajouter la nouvelle descente au DÉBUT du tableau pour l'afficher en premier
       setListeDescentes(prev => [nouvelleDescentePourAffichage, ...prev]);
       
-      // Afficher message de succès
-      alert(result.message || "Descente enregistrée avec succès !");
+      addToast(result.message || "Descente enregistrée avec succès !", 'success');
       
-      // Réinitialiser le formulaire
       resetForm();
       setShowForm(false);
       
     } catch (error: any) {
       console.error("❌ Erreur lors de l'enregistrement:", error);
-      alert(`Erreur lors de l'enregistrement: ${error.message}`);
+      addToast(`Erreur lors de l'enregistrement: ${error.message}`, 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Fonctions utilitaires
   const formatDate = (dateString: string | Date) => {
     if (!dateString) return 'Non spécifié';
     try {
@@ -376,19 +503,13 @@ const FieldActionsComponent: React.FC = () => {
     }
   };
 
-  const formatTime = (timeString: string) => {
-    if (!timeString) return 'Non spécifié';
-    return timeString;
-  };
-
-  // Filtrage et pagination
   const filteredDescentes = listeDescentes.filter(descente => {
     const statusMatch = activeTab === 'all' || 
       (descente.actions && String(descente.actions).toLowerCase().includes(activeTab));
 
     const searchMatch = searchTerm === '' || 
       (descente.commune && String(descente.commune).toLowerCase().includes(searchTerm.toLowerCase())) || 
-      (descente.localite && String(descente.localite).toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (descente.localisati && String(descente.localisati).toLowerCase().includes(searchTerm.toLowerCase())) ||
       (descente.identifica && String(descente.identifica).toLowerCase().includes(searchTerm.toLowerCase()));
 
     return statusMatch && searchMatch;
@@ -409,6 +530,77 @@ const FieldActionsComponent: React.FC = () => {
 
   return (
     <div className="space-y-6 min-h-screen p-6 bg-gray-50">
+      {/* Toasts */}
+      {toasts.map(toast => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
+
+      {/* Modal de confirmation */}
+      {showConfirmationModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[3000] flex justify-center items-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 rounded-full bg-blue-100">
+                  <AlertCircle className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Confirmer l'enregistrement</h3>
+              </div>
+              <button 
+                onClick={() => setShowConfirmationModal(false)} 
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-gray-700 mb-2">Êtes-vous sûr de vouloir enregistrer cette nouvelle descente ?</p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                <h4 className="font-medium text-blue-800 mb-2">Résumé de la descente :</h4>
+                <div className="text-sm text-blue-700 space-y-1">
+                  <p><span className="font-medium">Date :</span> {formatDate(formData.dateDescente)}</p>
+                  <p><span className="font-medium">Heure :</span> {formData.heureDescente}</p>
+                  <p><span className="font-medium">Commune :</span> {formData.commune}</p>
+                  <p><span className="font-medium">Localité :</span> {formData.localite}</p>
+                  <p><span className="font-medium">Infraction :</span> {formData.infraction.substring(0, 50)}...</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => setShowConfirmationModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmSubmit}
+                disabled={isSubmitting}
+                className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${
+                  isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Enregistrement...</span>
+                  </div>
+                ) : (
+                  'Confirmer'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -478,7 +670,7 @@ const FieldActionsComponent: React.FC = () => {
       {showForm && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-xl font-semibold text-slate-800 mb-6">Nouvelle Descente sur Terrain</h2>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={(e) => { e.preventDefault(); openConfirmationModal(); }} className="space-y-6">
             {/* Actions et Modèle PV */}
             <div className="flex flex-col md:flex-row md:space-x-8 space-y-4 md:space-y-0">
               <div>
@@ -561,6 +753,20 @@ const FieldActionsComponent: React.FC = () => {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Référence OM</label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    name="reference" 
+                    placeholder="Référence OM" 
+                    value={formData.reference} 
+                    onChange={handleInputChange} 
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Verbalisateur */}
@@ -599,7 +805,7 @@ const FieldActionsComponent: React.FC = () => {
               </div>
             </div>
 
-            {/* Informations Personne R et localisation */}
+            {/* Informations Personne R */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Personne R (PROPRIETAIRE OU REPRESENTANT)</label>
@@ -633,6 +839,42 @@ const FieldActionsComponent: React.FC = () => {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Contact et Adresse Personne R */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Contact Personne R</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    name="contactR" 
+                    placeholder="Contact de la personne R" 
+                    value={formData.contactR} 
+                    onChange={handleInputChange} 
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Adresse Personne R</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    name="adresseR" 
+                    placeholder="Adresse de la personne R" 
+                    value={formData.adresseR} 
+                    onChange={handleInputChange} 
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Localisation */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Commune</label>
                 <div className="relative">
@@ -730,6 +972,26 @@ const FieldActionsComponent: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Dossier à fournir */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-3">Dossier à fournir</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {dossierOptions.map((option) => (
+                  <label key={option} className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer border border-slate-300 rounded-lg p-3 hover:bg-slate-50">
+                    <input 
+                      type="checkbox" 
+                      value={option} 
+                      checked={formData.dossierAFournir.includes(option)} 
+                      onChange={handleDossierCheckboxChange} 
+                      className="form-checkbox text-blue-500 rounded" 
+                    />
+                    <span>{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             {/* Date et heure du rendez-vous */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -880,7 +1142,7 @@ const FieldActionsComponent: React.FC = () => {
                             {formatDate(descente.date_desce)}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{descente.localite || 'N/A'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{descente.localisati || 'N/A'}</td>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{descente.x_coord || 'N/A'}</td>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{descente.y_coord || 'N/A'}</td>
                         
@@ -944,7 +1206,7 @@ const FieldActionsComponent: React.FC = () => {
         )}
       </div>
 
-      {/* Modal de visualisation - SEULEMENT LES CHAMPS DU FORMULAIRE */}
+      {/* Modal de visualisation */}
       {showModal && selectedDescente && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[2000] flex justify-center items-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden">
@@ -972,9 +1234,26 @@ const FieldActionsComponent: React.FC = () => {
                     </div>
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Heure de descente</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-900">{selectedDescente.heure_descente || 'Non spécifié'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Numéro PV</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900">{selectedDescente.n_pv_pat || selectedDescente.n_fifafi || 'Non spécifié'}</p>
+                      <p className="text-gray-900">
+                        {selectedDescente.n_pv_pat || selectedDescente.n_fifafi || 'Non spécifié'}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Référence OM</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-900">{selectedDescente.reference?.trim() || 'Non spécifié'}</p>
                     </div>
                   </div>
                 </div>
@@ -984,13 +1263,17 @@ const FieldActionsComponent: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Type de verbalisateur</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900">{selectedDescente.n_pv_pat ? 'PAT' : selectedDescente.n_fifafi ? 'FIFAFI' : 'Non spécifié'}</p>
+                      <p className="text-gray-900">
+                        {selectedDescente.type_verbalisateur || 
+                         (selectedDescente.n_pv_pat ? 'PAT' : 
+                          selectedDescente.n_fifafi ? 'FIFAFI' : 'Non spécifié')}
+                      </p>
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Nom du verbalisateur</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900">{selectedDescente.personne_r || 'Non spécifié'}</p>
+                      <p className="text-gray-900">{selectedDescente.nom_verbalisateur || 'Non spécifié'}</p>
                     </div>
                   </div>
                 </div>
@@ -1000,13 +1283,35 @@ const FieldActionsComponent: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Type Personne R</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900">{selectedDescente.personne_r ? 'PROPRIETAIRE/REPRESENTANT' : 'Non spécifié'}</p>
+                      <p className="text-gray-900">
+                        {selectedDescente.personne_r || 'Non spécifié'}
+                      </p>
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Nom Personne R</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900">{selectedDescente.proprietaire || 'Non spécifié'}</p>
+                      <p className="text-gray-900">{selectedDescente.nom_personne_r || selectedDescente.proprietai || 'Non spécifié'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact et Adresse */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Personne R</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-900">
+                        {selectedDescente.contact_r || 'Non spécifié'}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Adresse Personne R</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-900">
+                        {selectedDescente.adresse_r || 'Non spécifié'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1022,13 +1327,13 @@ const FieldActionsComponent: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Fokontany</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900">{selectedDescente.localite || 'Non spécifié'}</p>
+                      <p className="text-gray-900">{selectedDescente.fokontany || 'Non spécifié'}</p>
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Localité</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900">{selectedDescente.localite || 'Non spécifié'}</p>
+                      <p className="text-gray-900">{selectedDescente.localisati || 'Non spécifié'}</p>
                     </div>
                   </div>
                 </div>
@@ -1038,13 +1343,17 @@ const FieldActionsComponent: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Coordonnée X (Latitude)</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900 font-mono">{selectedDescente.x_coord || 'N/A'}</p>
+                      <p className="text-gray-900 font-mono">
+                        {selectedDescente.x_coord || selectedDescente.x_long || 'N/A'}
+                      </p>
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Coordonnée Y (Longitude)</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-gray-900 font-mono">{selectedDescente.y_coord || 'N/A'}</p>
+                      <p className="text-gray-900 font-mono">
+                        {selectedDescente.y_coord || selectedDescente.y_lat || 'N/A'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1053,7 +1362,31 @@ const FieldActionsComponent: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Actions menées</label>
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-gray-900">{selectedDescente.actions || 'Aucune action spécifiée'}</p>
+                    <p className="text-gray-900">
+                      {selectedDescente.actions ? 
+                        selectedDescente.actions.split(',').map(action => {
+                          const actionMap: { [key: string]: string } = {
+                            'depotPv': 'Dépôt PV',
+                            'arretInteractif': 'Arrêt interactif des travaux',
+                            'nonRespect': 'Non-respect de l\'arrêt interactif'
+                          };
+                          return actionMap[action.trim()] || action.trim();
+                        }).join(', ') 
+                        : 'Aucune action spécifiée'
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* Dossier à fournir */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dossier à fournir</label>
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-gray-900">
+                      {selectedDescente.dossier_a_fournir && selectedDescente.dossier_a_fournir.length > 0 
+                        ? selectedDescente.dossier_a_fournir.join(', ')
+                        : selectedDescente.pieces_fou || 'Aucun dossier spécifié'}
+                    </p>
                   </div>
                 </div>
 
@@ -1071,9 +1404,7 @@ const FieldActionsComponent: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Date du rendez-vous</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-900">
-                        {selectedDescente.observation && selectedDescente.observation.includes('Rendez-vous:') 
-                          ? selectedDescente.observation.split('Rendez-vous:')[1]?.split(' ')[1] || 'Non spécifié'
-                          : 'Non spécifié'}
+                        {selectedDescente.date_rendez_vous ? formatDate(selectedDescente.date_rendez_vous) : 'Non spécifié'}
                       </p>
                     </div>
                   </div>
@@ -1081,11 +1412,21 @@ const FieldActionsComponent: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Heure du rendez-vous</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-900">
-                        {selectedDescente.observation && selectedDescente.observation.includes('Rendez-vous:') 
-                          ? selectedDescente.observation.split('Rendez-vous:')[1]?.split(' ')[2] || 'Non spécifié'
-                          : 'Non spécifié'}
+                        {selectedDescente.heure_rendez_vous || 'Non spécifié'}
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* Modèle PV */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Modèle PV</label>
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-gray-900">
+                      {selectedDescente.modele_pv || 
+                       (selectedDescente.n_pv_pat ? 'PAT' : 
+                        selectedDescente.n_fifafi ? 'FIFAFI' : 'Non spécifié')}
+                    </p>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,3 @@
-// models/rendezvousModel.js
 import pool from '../config/db.js';
 
 class RendezvousModel {
@@ -77,6 +76,70 @@ class RendezvousModel {
       return result.rows[0];
     } catch (error) {
       throw new Error(`Erreur lors de la récupération des statistiques: ${error.message}`);
+    }
+  }
+  static async sendMiseEnDemeure(id, nouvelleDate = null, nouvelleHeure = null) {
+    try {
+      const query = `
+        UPDATE rendezvous 
+        SET 
+          statut = 'En cours',
+          is_mise_en_demeure = true,
+          mise_en_demeure_sent = true,
+          date_rendez_vous = COALESCE($1, date_rendez_vous),
+          heure_rendez_vous = COALESCE($2, heure_rendez_vous),
+          date_envoi_mise_en_demeure = NOW()
+        WHERE id = $3
+        RETURNING *
+      `;
+      const result = await pool.query(query, [nouvelleDate, nouvelleHeure, id]);
+      return result.rows[0];
+    } catch (error) {
+      throw new Error(`Erreur lors de l'envoi de la mise en demeure: ${error.message}`);
+    }
+  }
+
+  // Récupérer les rendez-vous éligibles pour mise en demeure (7 jours après la date)
+  static async getRendezvousEligibleForMiseEnDemeure() {
+    try {
+      const query = `
+        SELECT * FROM rendezvous 
+        WHERE statut = 'Non comparution' 
+          AND mise_en_demeure_sent = false
+          AND date_rendez_vous <= CURRENT_DATE - INTERVAL '7 days'
+        ORDER BY date_rendez_vous ASC
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (error) {
+      throw new Error(`Erreur lors de la récupération des rendez-vous éligibles: ${error.message}`);
+    }
+  }
+
+  // Vérifier si un rendez-vous est éligible pour mise en demeure
+  static async isEligibleForMiseEnDemeure(id) {
+    try {
+      const query = `
+        SELECT 
+          *,
+          (date_rendez_vous <= CURRENT_DATE - INTERVAL '7 days') as eligible
+        FROM rendezvous 
+        WHERE id = $1 
+          AND statut = 'Non comparution' 
+          AND mise_en_demeure_sent = false
+      `;
+      const result = await pool.query(query, [id]);
+      
+      if (result.rows.length === 0) {
+        return { eligible: false, rendezvous: null };
+      }
+      
+      return { 
+        eligible: result.rows[0].eligible, 
+        rendezvous: result.rows[0] 
+      };
+    } catch (error) {
+      throw new Error(`Erreur lors de la vérification d'éligibilité: ${error.message}`);
     }
   }
 }

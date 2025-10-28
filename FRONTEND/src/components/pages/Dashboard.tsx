@@ -121,15 +121,6 @@ const Dashboard: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [activeView, setActiveView] = useState<ContentView>('DescenteSurTerrain');
 
-    // Données pour les statistiques de descente
-    const statsDescente = {
-        totalDescentes: 156,
-        superficieTotale: 2450,
-        pourcentageSuperficie: 68.5,
-        descentesParCommune: 12,
-        descentesParMois: 13
-    };
-
     // StatsCard
     const stats = [
         { title: 'Descente sur terrain', value: totalServiceEnvoyeur.toString(), icon: MapPin, color: 'blue', change: '+5%', view: 'DescenteSurTerrain' as ContentView },
@@ -156,6 +147,115 @@ const Dashboard: React.FC = () => {
           <button className="mt-4 text-blue-500 text-sm font-semibold hover:text-blue-700 focus:outline-none" onClick={(e) => { e.stopPropagation(); setActiveView(view); }}>Voir plus →</button>
         </div>
     );
+
+    // Composant pour afficher les statistiques de descente avec surfaces
+    const StatsDescenteComponent = () => {
+      // Données simulées pour les surfaces par type de zone (en km²)
+      const surfacesParZone = [
+        { type: 'Zone constructible', surface: 8.5, couleur: '#4BC0C0' },
+        { type: 'Zone non constructible', surface: 12.3, couleur: '#FF6384' },
+        { type: 'Zone résidentielle', surface: 6.2, couleur: '#36A2EB' },
+        { type: 'Zone commerciale', surface: 3.1, couleur: '#FFCE56' },
+        { type: 'Zone industrielle', surface: 4.7, couleur: '#9966FF' },
+        { type: 'Équipement public', surface: 2.8, couleur: '#FF9F40' },
+        { type: 'Voirie existante', surface: 5.4, couleur: '#C9CBCF' }
+      ];
+    
+      const surfaceTotale = surfacesParZone.reduce((total, zone) => total + zone.surface, 0);
+    
+      return (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow h-full">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-800">Rapport de Surfaces (km²)</h3>
+            <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+              <MoreVertical className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <div className="space-y-6">
+            {/* Surface totale */}
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-600 text-sm font-medium">Surface totale inspectée</p>
+                  <p className="text-2xl font-bold text-blue-800 mt-1">{surfaceTotale.toFixed(1)} km²</p>
+                </div>
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-blue-500">
+                <span className="font-semibold">+8%</span> vs mois dernier
+              </div>
+            </div>
+    
+            {/* Graphique des surfaces par type de zone */}
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <h4 className="text-sm font-semibold text-gray-700 mb-4">Répartition par type de zone</h4>
+              <div className="space-y-3">
+                {surfacesParZone.map((zone, index) => {
+                  const pourcentage = (zone.surface / surfaceTotale) * 100;
+                  return (
+                    <div key={index} className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-medium text-gray-600">{zone.type}</span>
+                        <span className="text-gray-500">{zone.surface} km² ({pourcentage.toFixed(1)}%)</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="h-2 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${pourcentage}%`,
+                            backgroundColor: zone.couleur
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+    
+            {/* Statistiques détaillées */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Détail des surfaces</h4>
+              <div className="space-y-2">
+                {surfacesParZone.map((zone, index) => (
+                  <div key={index} className="flex items-center justify-between py-1">
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: zone.couleur }}
+                      />
+                      <span className="text-xs text-gray-600">{zone.type}</span>
+                    </div>
+                    <span className="text-xs font-semibold text-gray-700">
+                      {zone.surface} km²
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+    
+            {/* Indicateurs clés */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                <p className="text-green-600 text-xs font-medium">Zone constructible</p>
+                <p className="text-lg font-bold text-green-800 mt-1">
+                  {((surfacesParZone.find(z => z.type === 'Zone constructible')?.surface || 0) / surfaceTotale * 100).toFixed(1)}%
+                </p>
+              </div>
+              <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                <p className="text-orange-600 text-xs font-medium">Zone résidentielle</p>
+                <p className="text-lg font-bold text-orange-800 mt-1">
+                  {((surfacesParZone.find(z => z.type === 'Zone résidentielle')?.surface || 0) / surfaceTotale * 100).toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
 
     // Fetch situations
     useEffect(() => {
@@ -208,100 +308,6 @@ const Dashboard: React.FC = () => {
         };
         fetchDescentesParMois();
     }, []);
-
-    // Composant pour afficher les statistiques de descente
-    const StatsDescenteComponent = () => (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow h-full">
-            <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-800">Statistiques des Descentes</h3>
-                <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                    <MoreVertical className="w-4 h-4" />
-                </button>
-            </div>
-            
-            <div className="space-y-6">
-                {/* Nombre total de descentes */}
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-blue-600 text-sm font-medium">Nombre total de descentes</p>
-                            <p className="text-2xl font-bold text-blue-800 mt-1">{statsDescente.totalDescentes}</p>
-                        </div>
-                        <div className="p-2 bg-blue-100 rounded-full">
-                            <MapPin className="w-5 h-5 text-blue-600" />
-                        </div>
-                    </div>
-                    <div className="mt-2 text-xs text-blue-500">
-                        <span className="font-semibold">+8%</span> vs mois dernier
-                    </div>
-                </div>
-
-                {/* Superficie totale */}
-                <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-green-600 text-sm font-medium">Superficie totale (ha)</p>
-                            <p className="text-2xl font-bold text-green-800 mt-1">{statsDescente.superficieTotale} ha</p>
-                        </div>
-                        <div className="p-2 bg-green-100 rounded-full">
-                            <Home className="w-5 h-5 text-green-600" />
-                        </div>
-                    </div>
-                    <div className="mt-2 text-xs text-green-500">
-                        <span className="font-semibold">+12%</span> vs mois dernier
-                    </div>
-                </div>
-
-                {/* Pourcentage superficie */}
-                <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-purple-600 text-sm font-medium">Pourcentage superficie</p>
-                            <p className="text-2xl font-bold text-purple-800 mt-1">{statsDescente.pourcentageSuperficie}%</p>
-                        </div>
-                        <div className="p-2 bg-purple-100 rounded-full">
-                            <FileText className="w-5 h-5 text-purple-600" />
-                        </div>
-                    </div>
-                    <div className="mt-2 text-xs text-purple-500">
-                        <span className="font-semibold">+3.2%</span> vs mois dernier
-                    </div>
-                </div>
-
-                {/* Nombre de descentes par commune */}
-                <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-orange-600 text-sm font-medium">Descentes par commune</p>
-                            <p className="text-2xl font-bold text-orange-800 mt-1">{statsDescente.descentesParCommune}</p>
-                        </div>
-                        <div className="p-2 bg-orange-100 rounded-full">
-                            <Users className="w-5 h-5 text-orange-600" />
-                        </div>
-                    </div>
-                    <div className="mt-2 text-xs text-orange-500">
-                        Moyenne sur 15 communes
-                    </div>
-                </div>
-
-                {/* Nombre de descentes par mois */}
-                <div className="bg-red-50 rounded-lg p-4 border border-red-100">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-red-600 text-sm font-medium">Descentes par mois</p>
-                            <p className="text-2xl font-bold text-red-800 mt-1">{statsDescente.descentesParMois}</p>
-                        </div>
-                        <div className="p-2 bg-red-100 rounded-full">
-                            <Calendar className="w-5 h-5 text-red-600" />
-                        </div>
-                    </div>
-                    <div className="mt-2 text-xs text-red-500">
-                        <span className="font-semibold">+15%</span> vs mois dernier
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
 
     // Render content view
     const renderContentView = (view: ContentView) => {

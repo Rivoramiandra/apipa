@@ -21,7 +21,14 @@ import statsituationRoutes from "./routes/statsituationRoutes.js";
 import statcommuneRoutes from "./routes/statcommuneRoutes.js"; 
 import statDescentesRoutes from './routes/statDescentesRoute.js'; 
 import nouvelleDescenteRoutes from "./routes/nouvelleDescenteRoutes.js";
-import rendezvousRoutes from './routes/rendezvousRoutes.js'; // ✅ Ajouter .js
+import rendezvousRoutes from './routes/rendezvousRoutes.js';
+import ftRoutes from './routes/ftRoutes.js'; 
+import faireapRoutes from './routes/faireapRoutes.js';
+
+import apRoutes from './routes/apRoutes.js';
+import paiementRoutes from "./routes/paiementRoutes.js";
+import ApScheduler from './schedulers/apScheduler.js';
+
 
 const app = express();
 const PORT = 3000;
@@ -29,6 +36,12 @@ const PORT = 3000;
 // Middleware
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
+
+// Middleware de logging pour debug
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // --- ROUTES ---
 app.use("/api", terrainRoutes);
@@ -48,20 +61,42 @@ app.use('/api/demandepc', demandePCRoutes);
 app.use("/api", statsituationRoutes);
 app.use("/api", statcommuneRoutes);
 app.use('/api/stat-descentes', statDescentesRoutes);
-app.use('/api/rendezvous', rendezvousRoutes); // ✅ Route rendez-vous
-
+app.use('/api/rendezvous', rendezvousRoutes);
+app.use('/api/faireap', faireapRoutes);
+app.use('/api/ft', ftRoutes);
+app.use('/api', apRoutes);
+app.use('/api/ap', apRoutes);
+app.use('/api', paiementRoutes);
+app.use('/api/aps', apRoutes);
 // Simple home page
 app.get("/", (req, res) => {
   res.send("✅ Serveur Express fonctionne !");
 });
 
-// Middleware de logging pour debug
-app.use((req, res, next) => {
-  console.log(`📨 ${req.method} ${req.path}`, req.body);
-  next();
+// Route de test pour vérifier que FT fonctionne
+app.get("/api/test-ft", (req, res) => {
+  res.json({ 
+    success: true,
+    message: "Route FT test fonctionne",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ SUPPRESSION de la route 44 problématique
+// Express gère automatiquement les routes non trouvées
+
+// Middleware de gestion d'erreurs global
+app.use((error, req, res, next) => {
+  console.error('💥 Erreur serveur:', error);
+  res.status(500).json({
+    success: false,
+    message: 'Erreur interne du serveur',
+    error: process.env.NODE_ENV === 'development' ? error.message : undefined
+  });
 });
 
 // Lancement du serveur
 app.listen(PORT, () => {
   console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`);
+  ApScheduler.init();
 });

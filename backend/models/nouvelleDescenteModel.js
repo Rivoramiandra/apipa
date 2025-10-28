@@ -3,72 +3,60 @@ import pool from "../config/db.js";
 class NouvelleDescente {
   static async create(nouvelleDescenteData) {
     const {
-      date_desce, // ✅ Correction: correspond à date_desce dans la table
+      date_desce,
       heure_descente,
       date_rendez_vous,
       heure_rendez_vous,
-      n_pv_pat,    // ✅ Correction: utilise n_pv_pat au lieu de numero_pv
-      n_fifafi,    // ✅ Correction: utilise n_fifafi selon le modèle
+      n_pv_pat,
+      n_fifafi,
       type_verbalisateur,
       nom_verbalisateur,
       personne_r,
       nom_personne_r,
       commune,
       fokontany,
-      localisation, // ✅ Correction: correspond à localisati dans la table
+      localisation,
       x_coord,
       y_coord,
-      x_long,       // ✅ Ajout des champs manquants
+      x_long,
       y_lat,
       infraction,
       actions,
-      proprietaire, // ✅ Ajout: mapping vers proprietai
-      modele_pv
+      proprietaire,
+      modele_pv,
+      reference,
+      contact_r,
+      adresse_r,
+      dossier_a_fournir
     } = nouvelleDescenteData;
 
-    // ✅ Requête SQL corrigée avec les bons noms de colonnes
     const query = `
       INSERT INTO depuisavril (
         date_desce, heure_descente, date_rendez_vous, heure_rendez_vous,
         n_pv_pat, n_fifafi, type_verbalisateur, nom_verbalisateur, 
         personne_r, nom_personne_r, commune, fokontany, localisati, 
         x_coord, y_coord, x_long, y_lat, infraction, actions, 
-        proprietai, modele_pv, created_at,
-        -- Champs avec valeurs par défaut pour éviter les erreurs
+        proprietai, modele_pv, reference, created_at,
         actions_su, superficie, destinatio, montant, suite_a_do, 
         amende_reg, n_pv_api, pieces_fou, recommanda, "Montant _1", 
-        "Montant _2", referenc, observatio, situation, situatio_1
+        "Montant _2", observatio, situation, situatio_1,
+        contact_r, adresse_r, dossier_a_fournir
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
-        $14, $15, $16, $17, $18, $19, $20, $21, NOW(),
-        -- Valeurs par défaut pour les champs obligatoires
-        '', 0, '', '0', '', '0', '', '', '', '0', '0', '', '', 'en_cours', 'en_attente'
+        $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW(),
+        '', 0, '', '0', '', '0', '', '', '', '0', '0', '', 'en_cours', 'en_attente',
+        $23, $24, $25
       )
       RETURNING *
     `;
 
     const values = [
-      date_desce,                    // $1
-      heure_descente,               // $2
-      date_rendez_vous || null,     // $3
-      heure_rendez_vous || null,    // $4
-      modele_pv === 'PAT' ? n_pv_pat : null,  // $5: n_pv_pat
-      modele_pv === 'FIFAFI' ? n_fifafi : null, // $6: n_fifafi
-      type_verbalisateur,           // $7
-      nom_verbalisateur,            // $8
-      personne_r,                   // $9
-      nom_personne_r,               // $10
-      commune,                      // $11
-      fokontany,                    // $12
-      localisation,                 // $13: mappe vers localisati
-      x_coord || null,              // $14
-      y_coord || null,              // $15
-      y_coord || null,              // $16: x_long (inversion potentielle)
-      x_coord || null,              // $17: y_lat (inversion potentielle)
-      infraction,                   // $18
-      actions,                      // $19: déjà formaté en string
-      proprietaire,                 // $20: proprietai dans la table
-      modele_pv                     // $21
+      date_desce, heure_descente, date_rendez_vous || null, heure_rendez_vous || null,
+      n_pv_pat, n_fifafi, type_verbalisateur, nom_verbalisateur,
+      personne_r, nom_personne_r, commune, fokontany, localisation,
+      x_coord || null, y_coord || null, x_long || null, y_lat || null,
+      infraction, actions, proprietaire, modele_pv, reference || null,
+      contact_r || null, adresse_r || null, dossier_a_fournir || []
     ];
 
     try {
@@ -82,13 +70,9 @@ class NouvelleDescente {
     }
   }
 
-  // ✅ Méthode pour récupérer toutes les descentes
   static async findAll() {
     try {
-      const query = `
-        SELECT * FROM depuisavril 
-        ORDER BY created_at DESC
-      `;
+      const query = `SELECT * FROM depuisavril ORDER BY created_at DESC`;
       const result = await pool.query(query);
       return result.rows;
     } catch (error) {
@@ -96,7 +80,6 @@ class NouvelleDescente {
     }
   }
 
-  // ✅ Méthode pour récupérer par ID
   static async findById(id) {
     try {
       const query = `SELECT * FROM depuisavril WHERE n = $1`;

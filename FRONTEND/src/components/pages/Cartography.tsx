@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -301,6 +301,7 @@ const Cartography: React.FC = () => {
   const [searchX, setSearchX] = useState("");
   const [searchY, setSearchY] = useState("");
   const [searchResult, setSearchResult] = useState<any | null>(null);
+  const [searchResultType, setSearchResultType] = useState<'terrain' | 'descente' | null>(null);
   const [isSatelliteView, setIsSatelliteView] = useState(false);
   const [searchMarker, setSearchMarker] = useState<[number, number] | null>(null);
   const [showLegend, setShowLegend] = useState(true);
@@ -314,6 +315,8 @@ const Cartography: React.FC = () => {
   const [showTerrains, setShowTerrains] = useState(true);
   const [showPrescriptions, setShowPrescriptions] = useState(true);
   const [showRemblais, setShowRemblais] = useState(true);
+
+  const mapRef = useRef<L.Map | null>(null);
 
   // Fonction pour mapper les champs selon différentes conventions de nommage
   const mapRemblaiFields = (item: any) => {
@@ -558,7 +561,7 @@ const Cartography: React.FC = () => {
     fetchData();
   }, []);
 
-  // Recherche terrain par coordonnées X Y
+  // Recherche par coordonnées X Y pour terrains ou descentes
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const x = parseFloat(searchX);
@@ -573,32 +576,39 @@ const Cartography: React.FC = () => {
       // Convertir les coordonnées X Y (EPSG:8441) en latitude/longitude (EPSG:4326)
       const [lng, lat] = proj4("EPSG:8441", "EPSG:4326", [x, y]);
       
-      // Trouver le terrain le plus proche (dans un rayon de 100m)
-      let closestPlot = null;
+      // Collecter tous les points (terrains et descentes)
+      const points = [
+        ...landData.map(plot => ({ ...plot, type: 'terrain' as const })),
+        ...remblais.map(r => ({ ...r, type: 'descente' as const }))
+      ];
+      
+      // Trouver le point le plus proche (dans un rayon de ~100m)
+      let closestPoint = null;
       let minDistance = Infinity;
       
-      landData.forEach(plot => {
-        const distance = Math.sqrt(Math.pow(plot.lat - lat, 2) + Math.pow(plot.lng - lng, 2));
+      points.forEach(point => {
+        const distance = Math.sqrt(Math.pow(point.lat - lat, 2) + Math.pow(point.lng - lng, 2));
         if (distance < minDistance) {
           minDistance = distance;
-          closestPlot = plot;
+          closestPoint = point;
         }
       });
       
-      // Si on a trouvé un terrain à moins de 0.001 degrés (environ 100m)
-      if (closestPlot && minDistance < 0.001) {
-        setSearchResult(closestPlot);
+      // Si on a trouvé un point à moins de 0.001 degrés (environ 100m)
+      if (closestPoint && minDistance < 0.001) {
+        setSearchResult(closestPoint);
+        setSearchResultType(closestPoint.type);
         setSearchMarker([lat, lng]);
         
         // Centrer la carte sur le point recherché
-        const map = L.DomUtil.get('map');
-        if (map) {
-          map.setView([lat, lng], 16);
+        if (mapRef.current) {
+          mapRef.current.setView([lat, lng], 16);
         }
       } else {
         setSearchResult(null);
+        setSearchResultType(null);
         setSearchMarker([lat, lng]);
-        alert("Aucun terrain trouvé à proximité de ces coordonnées.");
+        alert("Aucun terrain ou descente trouvé à proximité de ces coordonnées.");
       }
     } catch (error) {
       console.error("Erreur lors de la conversion des coordonnées:", error);
@@ -774,7 +784,7 @@ const Cartography: React.FC = () => {
           center={[-18.8792, 47.5079]} 
           zoom={6} 
           style={{ height: "100%", width: "100%" }}
-          id="map"
+          ref={mapRef}
         >
           {/* TileLayers */}
           <TileLayer
@@ -1244,21 +1254,34 @@ const Cartography: React.FC = () => {
           {searchResult && (
             <div className="absolute top-4 right-4 z-[1000] bg-white p-4 rounded-lg shadow-md max-w-xs">
               <div className="flex justify-between items-center mb-2">
-                <h4 className="font-bold text-slate-800">Terrain Trouvé</h4>
+                <h4 className="font-bold text-slate-800">{searchResultType === 'terrain' ? 'Terrain Trouvé' : 'Descente Trouvée'}</h4>
                 <button 
-                  onClick={() => setSearchResult(null)} 
+                  onClick={() => { setSearchResult(null); setSearchResultType(null); }} 
                   className="text-slate-500 hover:text-slate-700"
                 >
                   &times;
                 </button>
               </div>
               <div className="space-y-2 text-sm">
-                <p><strong>Propriétaire:</strong> {searchResult.PROPRIETAIRE}</p>
-                <p><strong>Commune:</strong> {searchResult.COMMUNE}</p>
-                <p><strong>Fokontany:</strong> {searchResult.FOKONTANY || "?"}</p>
-                <p><strong>Localisation:</strong> {searchResult.LOCALISATION || "?"}</p>
-                <p><strong>ID:</strong> {searchResult.IDENTIFICATION_DU_TERRAIN_parcelle_cadastrale_TITLE || "?"}</p>
-                <p><strong>Superficie:</strong> {searchResult.SUPERFICIE_TERRAIN_m} m²</p>
+                {searchResultType === 'terrain' ? (
+                  <>
+                    <p><strong>Propriétaire:</strong> {searchResult.PROPRIETAIRE}</p>
+                    <p><strong>Commune:</strong> {searchResult.COMMUNE}</p>
+                    <p><strong>Fokontany:</strong> {searchResult.FOKONTANY || "?"}</p>
+                    <p><strong>Localisation:</strong> {searchResult.LOCALISATION || "?"}</p>
+                    <p><strong>ID:</strong> {searchResult.IDENTIFICATION_DU_TERRAIN_parcelle_cadastrale_TITLE || "?"}</p>
+                    <p><strong>Superficie:</strong> {searchResult.SUPERFICIE_TERRAIN_m} m²</p>
+                  </>
+                ) : (
+                  <>
+                    <p><strong>Localité:</strong> {searchResult.localite || "Non spécifié"}</p>
+                    <p><strong>Commune:</strong> {searchResult.commune || "Non spécifié"}</p>
+                    <p><strong>Superficie:</strong> {searchResult.superficie ? `${searchResult.superficie} m²` : "Non spécifié"}</p>
+                    <p><strong>Identification:</strong> {searchResult.identifica || "Non spécifié"}</p>
+                    <p><strong>Infraction:</strong> {searchResult.infraction || "Non spécifié"}</p>
+                    <p><strong>Coordonnées X/Y:</strong> {searchResult._originalXCoord}, {searchResult._originalYCoord}</p>
+                  </>
+                )}
               </div>
             </div>
           )}

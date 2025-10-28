@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
-import Header from './Header';
 import Dashboard from '../pages/Dashboard';
 import Cartography from '../pages/Cartography';
 import Descente from '../pages/Descente';
@@ -8,6 +7,11 @@ import Notifications from '../pages/Notifications';
 import TruckAuthorization from '../pages/TruckAuthorization';
 import DemandePC from '../pages/FormulairePC';
 import RendezvousComponent from '../pages/RendezvousComponent';
+import FT from '../pages/FT';
+import AvisDePayement from '../pages/AvisDePayement';
+import Header from './Header';
+
+
 
 interface AdminLayoutProps {
   onLogout: () => void;
@@ -44,6 +48,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ onLogout }) => {
         return <DemandePC />;
       case 'rendezvous':
         return <RendezvousComponent />;
+              case 'ft':
+        return <FT />;
+                      case 'avisdepayement':
+        return <AvisDePayement/>;
       default:
         return <Dashboard />;
     }
