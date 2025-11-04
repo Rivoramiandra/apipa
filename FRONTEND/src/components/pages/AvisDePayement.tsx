@@ -25,11 +25,11 @@ import {
   CreditCard,
   ShieldAlert,
   Timer,
-  Send,
-  User
+  Send
 } from 'lucide-react';
 import FaireAPComponent, { FTData } from './FaireAPComponent';
 import PasserPaiement, { PaymentDetails } from './PasserPaiement';
+import MiseEnDemeureNonPaiement from './MiseEnDemeureNonPaiement';
 
 // Interface pour les données AP basée sur votre table avisdepaiment
 export interface APData {
@@ -64,12 +64,6 @@ export interface APData {
   // Timestamps
   created_at: string;
   updated_at: string;
-
-  // Pour la mise en demeure
-  is_mise_en_demeure?: boolean;
-  nom_personne_r?: string;
-  commune?: string;
-  fokontany?: string;
 }
 
 // Interface pour la réponse API
@@ -239,7 +233,7 @@ const ListeAP: React.FC = () => {
   const [selectedStatut, setSelectedStatut] = useState<string>('tous');
   const [creatingAP, setCreatingAP] = useState(false);
   const [expandedStatuts, setExpandedStatuts] = useState<Set<string>>(
-    new Set(['en cours', 'traité', 'archivé', 'annulé', 'en attente de paiement', 'non comparution', 'Ready'])
+    new Set(['en cours', 'traité', 'archivé', 'annulé', 'en attente de paiement', 'non comparution'])
   );
   const [stats, setStats] = useState<Stats>({
     total: 0,
@@ -258,14 +252,11 @@ const ListeAP: React.FC = () => {
     'archivé': 1,
     'annulé': 1,
     'en attente de paiement': 1,
-    'non comparution': 1,
-    'Ready': 1
+    'non comparution': 1
   });
 
   // États pour la mise en demeure
   const [sendingMiseEnDemeure, setSendingMiseEnDemeure] = useState<number | null>(null);
-  const [selectedRdv, setSelectedRdv] = useState<number[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   // État pour le modal Faire AP
   const [createAPModal, setCreateAPModal] = useState<{
@@ -278,6 +269,15 @@ const ListeAP: React.FC = () => {
 
   // État pour le modal de paiement
   const [paymentModal, setPaymentModal] = useState<{
+    show: boolean;
+    ap: APData | null;
+  }>({
+    show: false,
+    ap: null
+  });
+
+  // État pour le modal de mise en demeure
+  const [miseEnDemeureModal, setMiseEnDemeureModal] = useState<{
     show: boolean;
     ap: APData | null;
   }>({
@@ -388,40 +388,13 @@ const ListeAP: React.FC = () => {
       return 'Non spécifié';
     };
 
-    // Formater date et heure
-    const formatDateTime = (date: string, time: string): string => {
-      return `${formatDate(date)} ${formatTime(time)}`;
-    };
-
-    // Formater le lieu
-    const formatLieu = (commune?: string, fokontany?: string, localite?: string): string => {
-      const parts = [commune, fokontany, localite].filter(Boolean);
-      return parts.length > 0 ? parts.join(', ') : 'Non spécifié';
-    };
-
-    // Obtenir la couleur du statut
-    const getStatusColor = (statut: string): string => {
-      const colors: { [key: string]: string } = {
-        'en cours': 'bg-yellow-100 text-yellow-800',
-        'traité': 'bg-green-100 text-green-800',
-        'archivé': 'bg-blue-100 text-blue-800',
-        'annulé': 'bg-red-100 text-red-800',
-        'en attente de paiement': 'bg-orange-100 text-orange-800',
-        'non comparution': 'bg-purple-100 text-purple-800'
-      };
-      return colors[statut] || 'bg-gray-100 text-gray-800';
-    };
-
     return {
       getStatutBadge,
       translateStatut,
       formatDate,
       formatTime,
       formatSuperficie,
-      formatDelaiPayment,
-      formatDateTime,
-      formatLieu,
-      getStatusColor
+      formatDelaiPayment
     };
   }, []);
 
@@ -431,10 +404,7 @@ const ListeAP: React.FC = () => {
     formatDate,
     formatTime,
     formatSuperficie,
-    formatDelaiPayment,
-    formatDateTime,
-    formatLieu,
-    getStatusColor
+    formatDelaiPayment
   } = formatters;
 
   /* ---------------------------- Fonctions de Fetch --------------------------- */
@@ -549,8 +519,7 @@ const ListeAP: React.FC = () => {
       'archivé': 1,
       'annulé': 1,
       'en attente de paiement': 1,
-      'non comparution': 1,
-      'Ready': 1
+      'non comparution': 1
     });
   }, []);
 
@@ -706,6 +675,16 @@ const ListeAP: React.FC = () => {
     setPaymentLoading(false);
   }, []);
 
+  // Fonction pour ouvrir le modal de mise en demeure
+  const openMiseEnDemeureModal = useCallback((ap: APData) => {
+    setMiseEnDemeureModal({ show: true, ap });
+  }, []);
+
+  // Fonction pour fermer le modal de mise en demeure
+  const closeMiseEnDemeureModal = useCallback(() => {
+    setMiseEnDemeureModal({ show: false, ap: null });
+  }, []);
+
   // Fonction pour gérer le paiement
   const handlePaymentSubmit = async (paymentDetails: PaymentDetails) => {
     try {
@@ -744,6 +723,15 @@ const ListeAP: React.FC = () => {
       // Gérer l'erreur (vous pourriez afficher un message d'erreur dans le modal)
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  // Fonction pour envoyer la mise en demeure (version simplifiée via modal)
+  const envoyerMiseEnDemeure = async (apId: number) => {
+    // Ouvrir le modal au lieu d'envoyer directement
+    const ap = apList.find(ap => ap.id === apId);
+    if (ap) {
+      openMiseEnDemeureModal(ap);
     }
   };
 
@@ -787,13 +775,6 @@ const ListeAP: React.FC = () => {
     return apList.slice(startIndex, endIndex);
   }, [pagination]);
 
-  const getPaginatedRendezvous = useCallback((rdvList: APData[], statut: string) => {
-    const currentPage = pagination[statut] || 1;
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    return rdvList.slice(startIndex, endIndex);
-  }, [pagination]);
-
   const getTotalPages = useCallback((apList: APData[]) => {
     return Math.ceil(apList.length / ITEMS_PER_PAGE);
   }, []);
@@ -804,70 +785,6 @@ const ListeAP: React.FC = () => {
       [statut]: newPage
     }));
   }, []);
-
-  // Fonctions pour la mise en demeure
-  const envoyerMiseEnDemeure = async (apId: number) => {
-    try {
-      setSendingMiseEnDemeure(apId);
-      console.log(`🔄 Envoi de mise en demeure pour l'AP ID: ${apId}`);
-      
-      const response = await fetch('http://localhost:3000/api/aps/mise-en-demeure', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ap_id: apId
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'envoi de la mise en demeure');
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log('✅ Mise en demeure envoyée:', result.message);
-        // Rafraîchir les données
-        await fetchAPData();
-        
-        // Afficher un message de succès
-        alert('Mise en demeure envoyée avec succès');
-      } else {
-        throw new Error(result.message || 'Erreur lors de l\'envoi');
-      }
-    } catch (err) {
-      console.error('❌ Erreur envoi mise en demeure:', err);
-      alert('Erreur lors de l\'envoi de la mise en demeure');
-    } finally {
-      setSendingMiseEnDemeure(null);
-    }
-  };
-
-  const toggleSelectRdv = (rdvId: number) => {
-    setSelectedRdv(prev => 
-      prev.includes(rdvId) 
-        ? prev.filter(id => id !== rdvId)
-        : [...prev, rdvId]
-    );
-  };
-
-  const handleViewClick = (rdv: APData) => {
-    openDetailModal(rdv);
-  };
-
-  const handleOpenMiseEnDemeureModal = (rdv: APData) => {
-    envoyerMiseEnDemeure(rdv.id);
-  };
-
-  // Filtrer les non-comparution prêtes pour mise en demeure
-  const nonComparutionReady = useMemo(() => {
-    return filteredList.filter(ap => 
-      ap.statut === 'non comparution' 
-      // Ajoutez ici d'autres critères pour déterminer si c'est "prêt"
-    );
-  }, [filteredList]);
 
   // Statistiques pour les cartes
   const statCards = useMemo((): StatCard[] => [
@@ -979,6 +896,19 @@ const ListeAP: React.FC = () => {
               fetchAPData();
             }}
             loading={paymentLoading}
+          />
+        )}
+
+        {/* Modal Mise en Demeure Non Paiement */}
+        {miseEnDemeureModal.show && miseEnDemeureModal.ap && (
+          <MiseEnDemeureNonPaiement
+            ap={miseEnDemeureModal.ap}
+            onClose={closeMiseEnDemeureModal}
+            onSuccess={() => {
+              closeMiseEnDemeureModal();
+              fetchAPData();
+            }}
+            loading={sendingMiseEnDemeure === miseEnDemeureModal.ap.id}
           />
         )}
 
@@ -1111,138 +1041,6 @@ const ListeAP: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Section dédiée pour les non-comparution prêtes pour mise en demeure (affichées en cards) */}
-        {nonComparutionReady.length > 0 && (
-          <div key="ready" className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            {/* Header */}
-            <div 
-              className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => toggleStatut('Ready')}
-            >
-              <div className="flex items-center space-x-3">
-                <FileText className="w-5 h-5 text-yellow-600" />
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Prêts pour mise en demeure
-                </h3>
-                <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                  {nonComparutionReady.length} RDV
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-500">
-                  {expandedStatuts.has('Ready') ? 'Réduire' : 'Développer'}
-                </span>
-                <div className={`transform transition-transform ${expandedStatuts.has('Ready') ? 'rotate-180' : ''}`}>
-                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Cards */}
-            {expandedStatuts.has('Ready') && (
-              <div>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {getPaginatedRendezvous(nonComparutionReady, 'Ready').map((rdv) => (
-                    <div key={rdv.id} className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <input
-                          type="checkbox"
-                          checked={selectedRdv.includes(rdv.id)}
-                          onChange={() => toggleSelectRdv(rdv.id)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-xs px-2 py-1 rounded ${getStatusColor(rdv.statut)}`}>
-                            {rdv.statut}
-                          </span>
-                          {/* BADGE POUR LES MISE EN DEMEURE EXISTANTES */}
-                          {rdv.is_mise_en_demeure && (
-                            <span className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-800 border border-orange-300">
-                              📧 Mise en demeure
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <h4 className="text-sm font-medium text-gray-900">
-                        {rdv.infraction || 'Infraction non spécifiée'}
-                      </h4>
-                      <div className="text-sm text-gray-600 flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span>{formatDateTime(rdv.date_ft, rdv.heure_ft)}</span>
-                      </div>
-                      <div className="text-sm text-gray-600 flex items-center space-x-2">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        <span>{formatLieu(rdv.commune, rdv.fokontany, rdv.localite)}</span>
-                      </div>
-                      <div className="text-sm text-gray-600 flex items-center space-x-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span>{rdv.nom_personne_r || 'Non spécifié'}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 pt-2 border-t border-gray-200">
-                        <button
-                          onClick={() => handleViewClick(rdv)}
-                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                          title="Voir les détails"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenMiseEnDemeureModal(rdv)}
-                          disabled={isLoading}
-                          className={`text-xs font-medium px-2 py-1 rounded transition ${
-                            !isLoading
-                              ? 'bg-yellow-500 text-white hover:bg-yellow-600'
-                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          }`}
-                          title="Envoyer la mise en demeure de non comparution"
-                        >
-                          Envoyer Mise en Demeure
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {getTotalPages(nonComparutionReady) > 1 && (
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
-                    <div className="text-sm text-gray-700">
-                      Affichage de {((pagination['Ready'] - 1) * ITEMS_PER_PAGE) + 1} à {Math.min(pagination['Ready'] * ITEMS_PER_PAGE, nonComparutionReady.length)} sur {nonComparutionReady.length} rendez-vous
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handlePageChange('Ready', pagination['Ready'] - 1)}
-                        disabled={pagination['Ready'] === 1}
-                        className={`flex items-center space-x-1 px-3 py-2 rounded-lg border text-sm font-medium ${
-                          pagination['Ready'] === 1
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-white text-gray-700 hover:bg-gray-50 cursor-pointer'
-                        }`}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        <span>Précédent</span>
-                      </button>
-                      <button
-                        onClick={() => handlePageChange('Ready', pagination['Ready'] + 1)}
-                        disabled={pagination['Ready'] === getTotalPages(nonComparutionReady)}
-                        className={`flex items-center space-x-1 px-3 py-2 rounded-lg border text-sm font-medium ${
-                          pagination['Ready'] === getTotalPages(nonComparutionReady)
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-white text-gray-700 hover:bg-gray-50 cursor-pointer'
-                        }`}
-                      >
-                        <span>Suivant</span>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Liste des AP Groupés par Statut */}
         <div className="space-y-4">
@@ -1379,7 +1177,7 @@ const ListeAP: React.FC = () => {
                                 {/* Bouton Envoyer mise en demeure pour non comparution */}
                                 {ap.statut === 'non comparution' && (
                                   <button
-                                    onClick={() => envoyerMiseEnDemeure(ap.id)}
+                                    onClick={() => openMiseEnDemeureModal(ap)}
                                     disabled={sendingMiseEnDemeure === ap.id}
                                     className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                                     title="Envoyer une mise en demeure"

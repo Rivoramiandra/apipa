@@ -29,8 +29,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, coll
     { id: 'rendezvous', label: 'Faire F.T', icon: ClipboardList  },
     { id: 'ft', label: 'Listes F.T', icon: ClipboardList }, // ✅ Added
     { id: 'avisdepayement', label: 'Faire A.P', icon: CheckCircle },
-    { id: 'pc-request', label: 'Demande PC - Permis de construction', icon: FileText },
-    { id: 'truck-authorization', label: 'Autorisation Camion', icon: Car },
+    { id: 'pc-request', label: 'Paiement ', icon: FileText },
+    // { id: 'truck-authorization', label: 'Autorisation Camion', icon: Car },
   ];
 
   return (
