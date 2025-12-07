@@ -53,7 +53,15 @@ class ApController {
                 });
             }
 
-            const ftData = await ApModel.getFTById(parseInt(id));
+            const parsedId = parseInt(id);
+            if (isNaN(parsedId) || parsedId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID du fait-terrain invalide'
+                });
+            }
+
+            const ftData = await ApModel.getFTById(parsedId);
             
             res.json({
                 success: true,
@@ -112,7 +120,15 @@ class ApController {
                 });
             }
 
-            const apData = await ApModel.getAPByFTId(parseInt(ftId));
+            const parsedFtId = parseInt(ftId);
+            if (isNaN(parsedFtId) || parsedFtId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID du fait-terrain invalide'
+                });
+            }
+
+            const apData = await ApModel.getAPByFTId(parsedFtId);
             
             res.json({
                 success: true,
@@ -145,6 +161,14 @@ class ApController {
                 });
             }
 
+            const parsedFtId = parseInt(ftId);
+            if (isNaN(parsedFtId) || parsedFtId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID du fait-terrain invalide'
+                });
+            }
+
             // Validation des champs requis
             const requiredFields = ['num_ap', 'date_ap', 'montant_chiffre', 'statut'];
             for (const field of requiredFields) {
@@ -159,7 +183,7 @@ class ApController {
             console.log('✅ Validation des champs passée, mise à jour de l\'AP...');
             
             // Utiliser updateAPFromFT avec ftId (pas apId)
-            const updatedAP = await ApModel.updateAPFromFT(parseInt(ftId), apData);
+            const updatedAP = await ApModel.updateAPFromFT(parsedFtId, apData);
             
             console.log('✅ AP mis à jour avec succès:', updatedAP.id);
             res.json({
@@ -278,7 +302,15 @@ class ApController {
                 });
             }
 
-            const updatedAP = await ApModel.update(parseInt(id), apData);
+            const apId = parseInt(id);
+            if (isNaN(apId) || apId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de l\'AP invalide'
+                });
+            }
+
+            const updatedAP = await ApModel.update(apId, apData);
             
             res.json({
                 success: true,
@@ -306,7 +338,15 @@ class ApController {
                 });
             }
 
-            const deletedAP = await ApModel.delete(parseInt(id));
+            const apId = parseInt(id);
+            if (isNaN(apId) || apId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de l\'AP invalide'
+                });
+            }
+
+            const deletedAP = await ApModel.delete(apId);
             
             res.json({
                 success: true,
@@ -588,6 +628,120 @@ class ApController {
             res.status(500).json({
                 success: false,
                 message: error.message
+            });
+        }
+    }
+
+    // ✅ MÉTHODE CORRIGÉE : Mise en demeure non paiement
+    static async sendMiseEnDemeure(req, res) {
+        try {
+            const { id } = req.params;
+            const { 
+                reference_ft, 
+                num_ap, 
+                nouveau_delai_paiement, 
+                message_personnalise 
+            } = req.body;
+
+            console.log('📧 ApController.sendMiseEnDemeure: Réception mise en demeure', {
+                id_ap: id,
+                reference_ft,
+                num_ap,
+                nouveau_delai_paiement,
+                message_personnalise
+            });
+
+            // Validation des données
+            if (!id) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de l\'AP requis'
+                });
+            }
+
+            if (!nouveau_delai_paiement) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Le nouveau délai de paiement est requis'
+                });
+            }
+
+            const apId = parseInt(id);
+            if (isNaN(apId) || apId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'ID de l\'AP invalide'
+                });
+            }
+
+            // 1. Vérifier que l'AP existe
+            const apData = await ApModel.getById(apId);
+            
+            if (!apData) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'AP non trouvé'
+                });
+            }
+
+            // 2. Enregistrer la mise en demeure (optionnel - si vous avez la table)
+            try {
+                const insertQuery = `
+                    INSERT INTO mise_en_demeure 
+                    (ap_id, reference_ft, num_ap, nouveau_delai_paiement, message_personnalise, date_envoi)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    RETURNING *
+                `;
+                
+                await ApModel.query(insertQuery, [
+                    apId,
+                    reference_ft || apData.reference_ft,
+                    num_ap || apData.num_ap,
+                    nouveau_delai_paiement,
+                    message_personnalise,
+                    new Date().toISOString()
+                ]);
+                console.log('✅ Mise en demeure enregistrée dans la base de données');
+            } catch (tableError) {
+                console.log('ℹ️ Table mise_en_demeure non disponible, continuation sans enregistrement...');
+            }
+
+            // 3. Mettre à jour la date limite de paiement de l'AP avec la NOUVELLE MÉTHODE
+            const updateData = {
+                date_delai_payment: nouveau_delai_paiement,
+                date_mise_a_jour: new Date().toISOString(),
+                statut: 'attente de paiement'
+            };
+
+            // Utiliser la nouvelle méthode spécifique pour mise en demeure
+            const updatedAP = await ApModel.updateMiseEnDemeure(apId, updateData);
+
+            console.log('✅ ApController.sendMiseEnDemeure: Mise en demeure traitée avec succès pour AP:', apId);
+
+            // 4. Ici vous pouvez ajouter l'envoi d'email
+            // await sendMiseEnDemeureEmail(apData, nouveau_delai_paiement, message_personnalise);
+
+            res.status(200).json({
+                success: true,
+                message: 'Mise en demeure envoyée avec succès',
+                data: {
+                    ap_id: apId,
+                    reference_ft: reference_ft || apData.reference_ft,
+                    num_ap: num_ap || apData.num_ap,
+                    nouveau_delai_paiement,
+                    message_personnalise,
+                    date_envoi: new Date().toISOString(),
+                    statut: updatedAP.statut,
+                    date_delai_payment: updatedAP.date_delai_payment
+                }
+            });
+
+        } catch (error) {
+            console.error('❌ Erreur dans ApController.sendMiseEnDemeure:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Erreur lors de l\'envoi de la mise en demeure',
+                error: error.message
             });
         }
     }

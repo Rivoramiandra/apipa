@@ -25,6 +25,9 @@ router.post('/overdue/force-check', ApController.forceCheckOverdueAPs);
 router.get('/:id/check-status', ApController.checkAPStatus);
 router.put('/:id/statut-with-motif', ApController.updateAPStatutWithMotif);
 
+// ✅ CORRECTION : Route pour mise en demeure avec :id
+router.put('/:id/mise-en-demeure-non-paiement', ApController.sendMiseEnDemeure);
+
 // Routes pour gestion directe des AP
 router.post('/', ApController.createAP);
 router.get('/:id', ApController.getAPById);

@@ -1,7 +1,71 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FileText, User, MapPin, Home, Archive, CheckCircle, ChevronLeft, ChevronRight, Calendar, Hash, Map, Ruler, Building, Target, ClipboardList, Clock, Search, X, AlertCircle, CheckCircle2, Download, Info } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  FileText, User, MapPin, Home, Archive, CheckCircle,
+  ChevronLeft, ChevronRight, Calendar, Hash, Map, Ruler,
+  Building, Target, ClipboardList, Clock, Search, X,
+  AlertCircle, CheckCircle2, Download, Info, Waves,
+  Plus, Eye
+} from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+
+// Couleur principale : Bleu aqua/eau
+const WATER_COLOR = {
+  50: '#f0f9ff',
+  100: '#e0f2fe',
+  200: '#bae6fd',
+  300: '#7dd3fc',
+  400: '#38bdf8',
+  500: '#0ea5e9',
+  600: '#0284c7',
+  700: '#0369a1',
+  800: '#075985',
+  900: '#0c4a6e'
+};
+
+// Composant Toast
+interface ToastProps {
+  message: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  onClose: () => void;
+}
+
+const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getBackgroundColor = () => {
+    switch (type) {
+      case 'success': return 'bg-[#0ea5e9]';
+      case 'error': return 'bg-[#0369a1]';
+      case 'warning': return 'bg-[#0284c7]';
+      case 'info': return 'bg-[#0ea5e9]';
+      default: return 'bg-[#0ea5e9]';
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success': return <CheckCircle className="w-5 h-5" />;
+      case 'error': return <AlertCircle className="w-5 h-5" />;
+      case 'warning': return <AlertCircle className="w-5 h-5" />;
+      case 'info': return <Waves className="w-5 h-5" />;
+      default: return <Waves className="w-5 h-5" />;
+    }
+  };
+
+  return (
+    <div className={`fixed top-4 right-4 ${getBackgroundColor()} text-white p-4 rounded-xl shadow-lg flex items-center space-x-3 min-w-80 z-[9999] animate-in slide-in-from-right-full border border-[#bae6fd]`}>
+      {getIcon()}
+      <span className="flex-1">{message}</span>
+      <button onClick={onClose} className="text-white hover:text-[#e0f2fe] transition-colors">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
 
 // Interface pour les données de rendez-vous
 export interface RendezvousData {
@@ -58,6 +122,8 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
   const [manualDossiers, setManualDossiers] = useState<string>('');
   const [apiError, setApiError] = useState<string>('');
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: 'success' | 'error' | 'warning' | 'info' }>>([]);
 
   const [formData, setFormData] = useState({
     idDescente: '',
@@ -79,7 +145,7 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
     contact: '',
     adresse: '',
     titreTerrain: '',
-    nomproprietaire: '', // CHANGÉ: 'im' remplacé par 'nomproprietaire'
+    nomproprietaire: '',
     localisation: '',
     superficie: '',
     motif: '',
@@ -94,6 +160,16 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
   // Liste des options de dossiers possibles
   const dossierOptions = ['CSJ', 'Plan off', "PU (Permis d'Utilisation)", 'Permis de Construction', 'Permis de Remblais'];
 
+  // Gestion des toasts
+  const addToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
   // Fonction pour générer une référence FT automatique
   const generateReferenceFT = () => {
     const now = new Date();
@@ -107,7 +183,7 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
     return `FT-${year}${month}${day}-${hours}${minutes}${seconds}`;
   };
 
-  // Fonction pour générer le contenu HTML du PDF (version améliorée)
+  // Fonction pour générer le contenu HTML du PDF
   const getPDFContent = (): string => {
     const currentDate = new Date().toLocaleDateString('fr-FR', {
       day: '2-digit',
@@ -137,7 +213,6 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
             <div style="font-style: italic; font-size: 10px; margin-bottom: 2px;">INONDATIONS DE LA PLAINE</div>
             <div style="font-style: italic; font-size: 10px; margin-bottom: 2px;">D'ANTANANARIVO</div>
           </div>
-          
           
           <div style="flex: 1; text-align: right;">
             <div style="font-size: 11px; margin-bottom: 3px;">Antananarivo, le ${currentDate}</div>
@@ -232,29 +307,22 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
           </div>
         </div>
         
-       <!-- Sections de signature -->
-<div style="margin-top: 40px; display: flex; justify-content: space-between;">
-
-  <!-- Bloc gauche : Signature du destinataire -->
-  <div>
-    <div style="font-weight: bold; margin-bottom: 20px;">Lu et approuvé,</div>
-    <div style="border-top: 1px solid #000; width: 300px; padding-top: 5px;">
-      <div style="text-align: center; font-style: italic;">Signature du destinataire</div>
-    </div>
-  </div>
-
-  <!-- Bloc droite : Signature APIPA -->
-  <div style="text-align: right;">
-    <div style="font-weight: bold; margin-bottom: 5px;">Antananarivo, le ${currentDate}</div>
-    <div style="font-style: italic; margin-bottom: 20px;">Le Directeur Général de l'APIPA</div>
-    <div style="border-top: 1px solid #000; width: 300px; margin-left: auto; padding-top: 5px;">
-      <div style="text-align: center; font-style: italic;">Signature et cachet</div>
-    </div>
-  </div>
-
-</div>
-        
-       
+        <!-- Sections de signature -->
+        <div style="margin-top: 40px; display: flex; justify-content: space-between;">
+          <div>
+            <div style="font-weight: bold; margin-bottom: 20px;">Lu et approuvé,</div>
+            <div style="border-top: 1px solid #000; width: 300px; padding-top: 5px;">
+              <div style="text-align: center; font-style: italic;">Signature du destinataire</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: bold; margin-bottom: 5px;">Antananarivo, le ${currentDate}</div>
+            <div style="font-style: italic; margin-bottom: 20px;">Le Directeur Général de l'APIPA</div>
+            <div style="border-top: 1px solid #000; width: 300px; margin-left: auto; padding-top: 5px;">
+              <div style="text-align: center; font-style: italic;">Signature et cachet</div>
+            </div>
+          </div>
+        </div>
       </div>
     `;
   };
@@ -264,7 +332,6 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
     try {
       console.log('🔄 Début de la génération du PDF APIPA...');
 
-      // Créer un élément temporaire pour le PDF avec des styles améliorés
       const pdfContainer = document.createElement('div');
       pdfContainer.style.position = 'fixed';
       pdfContainer.style.left = '-9999px';
@@ -279,12 +346,9 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
       pdfContainer.style.lineHeight = '1.4';
       pdfContainer.style.color = '#000000';
 
-      // Ajouter le contenu PDF avec les styles
       pdfContainer.innerHTML = getPDFContent();
-
       document.body.appendChild(pdfContainer);
 
-      // Attendre que le contenu soit rendu
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       const canvas = await html2canvas(pdfContainer, {
@@ -296,20 +360,9 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
         height: pdfContainer.scrollHeight,
         scrollX: 0,
         scrollY: 0,
-        onclone: (clonedDoc) => {
-          // Appliquer des styles supplémentaires sur le clone
-          const clonedContainer = clonedDoc.querySelector('.pdf-container');
-          if (clonedContainer) {
-            clonedContainer.style.fontFamily = 'Times New Roman, serif';
-            clonedContainer.style.fontSize = '12px';
-          }
-        }
       });
 
-      // Nettoyer l'élément temporaire
       document.body.removeChild(pdfContainer);
-
-      console.log('✅ Canvas généré:', canvas.width, 'x', canvas.height);
 
       if (canvas.width === 0 || canvas.height === 0) {
         throw new Error('Canvas vide - dimensions nulles');
@@ -329,11 +382,9 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
       let heightLeft = imgHeight;
       let position = 0;
 
-      // Ajouter la première page
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
-      // Ajouter des pages supplémentaires si nécessaire
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
@@ -341,19 +392,19 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
         heightLeft -= pageHeight;
       }
 
-      // Sauvegarder le PDF
       const fileName = `Avis_APIPA_${formData.referenceFT}_${new Date().getTime()}.pdf`;
       pdf.save(fileName);
       
       console.log('✅ PDF généré avec succès:', fileName);
+      addToast('PDF généré avec succès', 'success');
 
     } catch (error) {
       console.error('❌ Erreur lors de la génération du PDF:', error);
-      alert('Erreur lors de la génération du PDF APIPA. Voir la console pour plus de détails.');
+      addToast('Erreur lors de la génération du PDF', 'error');
     }
   };
 
-  // Pré-remplir automatiquement la référence FT quand on arrive à l'étape 1
+  // Pré-remplir automatiquement la référence FT
   useEffect(() => {
     if (currentStep === 1 && !formData.referenceFT) {
       const autoReference = generateReferenceFT();
@@ -363,33 +414,23 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
 
   // Fonction pour formater les dossiers à fournir
   const formatDossiersAFournir = (dossiers: any, infraction: string): string[] => {
-    console.log('📥 Dossier brut reçu :', dossiers);
-    console.log('📥 Infraction reçue :', infraction);
-    
     if (!dossiers) {
-      console.log('⚠️ Aucun dossier fourni, tentative de déduction à partir de l\'infraction');
-      const deducedDossiers = getRequiredDossiers(infraction);
-      console.log('✅ Dossiers déduits à partir de l\'infraction :', deducedDossiers);
-      return deducedDossiers;
+      return getRequiredDossiers(infraction);
     }
     
     if (Array.isArray(dossiers)) {
-      console.log('✅ Dossier est un tableau :', dossiers);
       return dossiers;
     }
     
     if (typeof dossiers === 'string') {
       try {
         const parsed = JSON.parse(dossiers);
-        console.log('✅ Dossier parsé depuis JSON :', parsed);
         return Array.isArray(parsed) ? parsed : [dossiers];
       } catch {
-        console.log('⚠️ Erreur de parsing JSON, retour à la chaîne brute :', dossiers);
         return [dossiers];
       }
     }
     
-    console.log('⚠️ Format de dossier inconnu, retour aux dossiers déduits de l\'infraction');
     return getRequiredDossiers(infraction);
   };
 
@@ -397,11 +438,6 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
   const calculateMissingDossiers = (required: string[], selected: string[]) => {
     const missing = required.filter(d => !selected.includes(d));
     const isComplete = missing.length === 0;
-    
-    console.log('📋 Dossiers requis :', required);
-    console.log('📋 Dossiers fournis :', selected);
-    console.log('❌ Dossiers manquants :', missing.length > 0 ? missing : 'Aucun dossier manquant');
-    console.log('✅ Complétude :', isComplete ? 'Dossier complet' : 'Dossier incomplet');
     
     setMissingDossiers(missing);
     setIsDossierComplete(isComplete);
@@ -412,16 +448,9 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
   // Remplissage automatique UNIQUEMENT de la première page (Info Descente)
   useEffect(() => {
     if (rendezvousData) {
-      console.log('📋 Données rendezvousData:', rendezvousData);
-      console.log('📋 dossier_a_fournir brut:', rendezvousData.dossier_a_fournir);
-      
-      // Formater les dossiers à fournir
       const dossiersFormates = formatDossiersAFournir(rendezvousData.dossier_a_fournir, rendezvousData.infraction);
-      console.log('📋 dossier_a_fournir formaté:', dossiersFormates);
-      
       setDossiersFromRdv(dossiersFormates);
 
-      // Créer une chaîne formatée pour l'affichage dans l'input
       const dossiersString = dossiersFormates.length > 0 
         ? `Dossiers requis: ${dossiersFormates.join(', ')}` 
         : (rendezvousData.n_fifafi || 'Aucun dossier requis');
@@ -438,21 +467,20 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
         infraction: rendezvousData.infraction || '',
         dossier: dossiersString,
         action: rendezvousData.action || '',
-        dossierType: [], // Initialiser à vide pour permettre la sélection manuelle
+        dossierType: [],
       }));
 
-      // Calculer les dossiers manquants initiaux
       calculateMissingDossiers(dossiersFormates, []);
     }
   }, [rendezvousData]);
 
-  // Recalculer les dossiers manquants quand les sélections changent ou les dossiers requis manuels sont mis à jour
+  // Recalculer les dossiers manquants
   useEffect(() => {
     const requiredDossiers = manualDossiers ? manualDossiers.split(',').map(d => d.trim()).filter(d => d) : dossiersFromRdv;
     calculateMissingDossiers(requiredDossiers, formData.dossierType);
   }, [formData.dossierType, dossiersFromRdv, manualDossiers]);
 
-  // Calcul de la deadline lorsque la durée change ou la date FT
+  // Calcul de la deadline
   useEffect(() => {
     if (formData.durationComplement && formData.dateFT && currentStep === 5) {
       if (!isDossierComplete) {
@@ -467,22 +495,17 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
     }
   }, [formData.durationComplement, formData.dateFT, isDossierComplete, currentStep]);
 
+  // Pagination réduite - seulement 3 étapes principales
   const steps = [
-    { title: 'Info Descente', icon: Search },
-    { title: 'Référence FT', icon: Archive },
-    { title: 'Personne Convoquée', icon: User },
-    { title: 'Information du Terrain', icon: MapPin },
-    { title: 'Motif et Détails', icon: FileText },
-    { title: 'Type de Dossier', icon: Home }
+    { title: 'Informations Générales', icon: Search },
+    { title: 'Personne & Terrain', icon: User },
+    { title: 'Détails & Validation', icon: FileText }
   ];
 
   const getRequiredDossiers = (infraction: string): string[] => {
-    if (!infraction) {
-      console.log('⚠️ Aucune infraction fournie, retour d\'une liste vide');
-      return [];
-    }
+    if (!infraction) return [];
     const lower = infraction.toLowerCase();
-    const autoDossiers = dossierOptions.filter(option => {
+    return dossierOptions.filter(option => {
       const optLower = option.toLowerCase();
       if (lower.includes('csj') && optLower.includes('csj')) return true;
       if (lower.includes('plan') && optLower.includes('plan')) return true;
@@ -491,8 +514,6 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
       if (lower.includes('remblais') && optLower.includes('remblais')) return true;
       return false;
     });
-    console.log('🔍 Dossiers auto-détectés à partir de l\'infraction :', autoDossiers);
-    return autoDossiers;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -503,7 +524,6 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
       const newDossierType = checkbox.checked 
         ? [...formData.dossierType, value] 
         : formData.dossierType.filter(t => t !== value);
-      console.log('🔄 Mise à jour des dossiers sélectionnés :', newDossierType);
       setFormData(prev => ({
         ...prev,
         dossierType: newDossierType
@@ -516,31 +536,38 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
   };
 
   const isStepValid = () => {
-    if (currentStep === 0) return formData.idDescente && formData.numPV && formData.commune;
-    if (currentStep === 1) return formData.referenceFT && formData.dateFT && formData.heureFT;
-    if (currentStep === 2) return formData.typeConvoquee && formData.nomComplet && formData.cin && formData.contact && formData.adresse;
-    if (currentStep === 5) return true;
+    if (currentStep === 0) return formData.idDescente && formData.numPV && formData.commune && formData.referenceFT && formData.dateFT && formData.heureFT;
+    if (currentStep === 1) return formData.typeConvoquee && formData.nomComplet && formData.cin && formData.contact && formData.titreTerrain;
+    if (currentStep === 2) return true;
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const openConfirmationModal = () => {
+    if (!isStepValid()) {
+      addToast("Veuillez remplir tous les champs obligatoires", 'warning');
+      return;
+    }
+    setShowConfirmationModal(true);
+  };
+
+  const confirmSubmit = async () => {
+    setShowConfirmationModal(false);
+    await handleSubmit();
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
     setIsSubmitting(true);
     setApiError('');
     
     try {
       const requiredDossiers = manualDossiers ? manualDossiers.split(',').map(d => d.trim()).filter(d => d) : dossiersFromRdv;
-      console.log('✅ Données FT complètes :', formData);
-      console.log('✅ Dossiers requis (final) :', requiredDossiers);
-      console.log('✅ Dossiers manquants :', missingDossiers);
-      console.log('✅ Statut dossier :', isDossierComplete ? 'regularise' : 'irregularise');
-
       const hasRequiredDossiers = requiredDossiers.length > 0;
       const finalStatus = hasRequiredDossiers ? 
         (isDossierComplete ? 'regularise' : 'irregularise') : 
         'sans_dossier';
-      
-      // Préparer les données pour l'API
+
       const ftData = {
         rendezvous_id: parseInt(rendezvousData.id),
         reference_ft: formData.referenceFT,
@@ -578,9 +605,6 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
         deadline_complement: formData.deadline || null
       };
 
-      console.log('📤 Envoi des données F.T. à l\'API:', ftData);
-
-      // Envoyer les données à l'API
       const response = await fetch('http://localhost:3000/api/ft', {
         method: 'POST',
         headers: { 
@@ -593,8 +617,6 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
       
       if (!contentType || !contentType.includes('application/json')) {
         const textResponse = await response.text();
-        console.error('❌ Réponse non-JSON reçue:', textResponse.substring(0, 500));
-        
         if (response.status === 404) {
           throw new Error(`Endpoint API non trouvé (404). Vérifiez que la route /api/ft existe sur le serveur.`);
         } else if (response.status >= 500) {
@@ -611,30 +633,23 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
       }
 
       if (result.success) {
-        console.log('✅ F.T. créé avec succès:', result.data);
         setCreatedFT(result.data);
         
-        // Mettre à jour le statut du rendez-vous vers "Avec comparution"
+        // Mettre à jour le statut du rendez-vous
         try {
-          const updateRdvResponse = await fetch(`http://localhost:3000/api/rendezvous/${rendezvousData.id}/statut`, {
+          await fetch(`http://localhost:3000/api/rendezvous/${rendezvousData.id}/statut`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               statut: 'Avec comparution'
             })
           });
-
-          if (updateRdvResponse.ok) {
-            console.log('✅ Statut du rendez-vous mis à jour vers "Avec comparution"');
-          } else {
-            console.warn('⚠️ Impossible de mettre à jour le statut du rendez-vous');
-          }
         } catch (updateError) {
           console.warn('⚠️ Erreur lors de la mise à jour du statut du rendez-vous:', updateError);
         }
 
-        // Afficher le modal de succès avec option PDF
         setShowSuccessModal(true);
+        addToast('F.T. créé avec succès', 'success');
         
       } else {
         throw new Error(result.message || 'Erreur lors de la création du F.T.');
@@ -644,7 +659,7 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
       console.error('❌ Erreur lors de la création du F.T.:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       setApiError(errorMessage);
-      alert(`Erreur lors de la création du F.T.: ${errorMessage}`);
+      addToast(`Erreur lors de la création du F.T.: ${errorMessage}`, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -716,527 +731,557 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
     const hasRequiredDossiers = requiredDossiers.length > 0;
 
     const fields = [
-      // Step 0 - Info Descente (pré-remplie automatiquement)
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+      // Step 0 - Informations Générales (fusion des étapes 0 et 1)
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full overflow-y-auto pr-2">
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Hash className="w-4 h-4" />
-              ID Descente 
-            </label>
-            <input 
-              type="text" 
-              name="idDescente" 
-              value={formData.idDescente} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm" 
-              placeholder="ID de la descente" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <FileText className="w-4 h-4" />
-              Numéro PV 
-            </label>
-            <input 
-              type="text" 
-              name="numPV" 
-              value={formData.numPV} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm" 
-              placeholder="Numéro du PV" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Building className="w-4 h-4" />
-              Commune 
-            </label>
-            <input 
-              type="text" 
-              name="commune" 
-              value={formData.commune} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm" 
-              placeholder="Nom de la commune" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <MapPin className="w-4 h-4" />
-              Fokotany
-            </label>
-            <input 
-              type="text" 
-              name="fokotany" 
-              value={formData.fokotany} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm" 
-              placeholder="Nom du fokotany" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Map className="w-4 h-4" />
-              Localité
-            </label>
-            <input 
-              type="text" 
-              name="localite" 
-              value={formData.localite} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm" 
-              placeholder="Nom de la localité" 
-            />
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium flex items-center gap-2 mb-1">
-                <Target className="w-4 h-4" />
-                Coordonnée X
-              </label>
-              <input 
-                type="text" 
-                name="coordX" 
-                value={formData.coordX} 
-                onChange={handleChange} 
-                className="w-full border rounded-lg p-2 text-sm" 
-                placeholder="Coord. X" 
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium flex items-center gap-2 mb-1">
-                <Target className="w-4 h-4" />
-                Coordonnée Y
-              </label>
-              <input 
-                type="text" 
-                name="coordY" 
-                value={formData.coordY} 
-                onChange={handleChange} 
-                className="w-full border rounded-lg p-2 text-sm" 
-                placeholder="Coord. Y" 
-              />
+          <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+            <h3 className="font-medium text-[#0369a1] mb-3 flex items-center gap-2">
+              <Search className="w-4 h-4" />
+              Informations de Descente
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <Hash className="w-4 h-4" />
+                  ID Descente 
+                </label>
+                <input 
+                  type="text" 
+                  name="idDescente" 
+                  value={formData.idDescente} 
+                  onChange={handleChange} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  placeholder="ID de la descente" 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <FileText className="w-4 h-4" />
+                  Numéro PV 
+                </label>
+                <input 
+                  type="text" 
+                  name="numPV" 
+                  value={formData.numPV} 
+                  onChange={handleChange} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  placeholder="Numéro du PV" 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                    <Building className="w-4 h-4" />
+                    Commune 
+                  </label>
+                  <input 
+                    type="text" 
+                    name="commune" 
+                    value={formData.commune} 
+                    onChange={handleChange} 
+                    className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                    placeholder="Commune" 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                    <MapPin className="w-4 h-4" />
+                    Fokotany
+                  </label>
+                  <input 
+                    type="text" 
+                    name="fokotany" 
+                    value={formData.fokotany} 
+                    onChange={handleChange} 
+                    className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                    placeholder="Fokotany" 
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
+
+          <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+            <h3 className="font-medium text-[#0369a1] mb-3 flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              Infraction
-            </label>
-            <textarea 
-              name="infraction" 
-              value={formData.infraction} 
-              onChange={handleChange} 
-              placeholder="Description de l'infraction" 
-              rows={3} 
-              className="w-full border rounded-lg p-2 text-sm resize-none" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Target className="w-4 h-4" />
-              Action
-            </label>
-            <input 
-              type="text" 
-              name="action" 
-              value={formData.action} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm" 
-              placeholder="Action entreprise" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <FileText className="w-4 h-4" />
-              Dossier
-            </label>
-            <input 
-              type="text" 
-              name="dossier" 
-              value={formData.dossier} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm bg-blue-50 border-blue-200" 
-              placeholder="Les dossiers requis seront affichés ici" 
-              readOnly
-            />
-            {dossiersFromRdv.length > 0 && (
-              <p className="text-xs text-blue-600 mt-1">
-                {dossiersFromRdv.length} dossier(s) identifié(s) lors de la descente
-              </p>
-            )}
-          </div>
-        </div>
-      </div>,
-
-      // Step 1 - Référence FT (pré-remplie automatiquement)
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Hash className="w-4 h-4" />
-              Référence 
-            </label>
-            <input 
-              type="text" 
-              name="referenceFT" 
-              value={formData.referenceFT} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm bg-blue-50 border-blue-200" 
-              placeholder="La référence sera générée automatiquement" 
-            />
-            <p className="text-xs text-blue-600 mt-1">
-              Référence générée automatiquement
-            </p>
-          </div>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Calendar className="w-4 h-4" />
-              Date 
-            </label>
-            <input 
-              type="date" 
-              name="dateFT" 
-              value={formData.dateFT} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Clock className="w-4 h-4" />
-              Heure 
-            </label>
-            <input 
-              type="time" 
-              name="heureFT" 
-              value={formData.heureFT} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-        </div>
-      </div>,
-
-      // Step 2 - Personne Convoquée (vide - à remplir manuellement)
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <User className="w-4 h-4" />
-              Type de personne
-            </label>
-            <select 
-              name="typeConvoquee" 
-              value={formData.typeConvoquee} 
-              onChange={handleChange} 
-              className="w-full border rounded-lg p-2 text-sm"
-            >
-              <option value="">Sélectionnez le type</option>
-              <option value="proprietaire">Propriétaire</option>
-              <option value="representant">Représentant</option>
-              <option value="locataire">Locataire</option>
-              <option value="occupant">Occupant</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <User className="w-4 h-4" />
-              Nom complet 
-            </label>
-            <input 
-              type="text" 
-              name="nomComplet" 
-              value={formData.nomComplet} 
-              onChange={handleChange} 
-              placeholder="Nom complet de la personne convoquée" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <MapPin className="w-4 h-4" />
-              Adresse 
-            </label>
-            <textarea 
-              name="adresse" 
-              value={formData.adresse} 
-              onChange={handleChange} 
-              placeholder="Adresse complète de la personne" 
-              rows={3} 
-              className="w-full border rounded-lg p-2 text-sm resize-none" 
-            />
+              Détails de l'Infraction
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4" />
+                  Infraction
+                </label>
+                <textarea 
+                  name="infraction" 
+                  value={formData.infraction} 
+                  onChange={handleChange} 
+                  placeholder="Description de l'infraction" 
+                  rows={3} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all resize-none" 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4" />
+                  Action
+                </label>
+                <input 
+                  type="text" 
+                  name="action" 
+                  value={formData.action} 
+                  onChange={handleChange} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  placeholder="Action entreprise" 
+                />
+              </div>
+            </div>
           </div>
         </div>
         
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Hash className="w-4 h-4" />
-              CIN 
-            </label>
-            <input 
-              type="text" 
-              name="cin" 
-              value={formData.cin} 
-              onChange={handleChange} 
-              placeholder="Numéro de CIN" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
+          <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+            <h3 className="font-medium text-[#0369a1] mb-3 flex items-center gap-2">
+              <Archive className="w-4 h-4" />
+              Référence F.T.
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <Hash className="w-4 h-4" />
+                  Référence 
+                </label>
+                <input 
+                  type="text" 
+                  name="referenceFT" 
+                  value={formData.referenceFT} 
+                  onChange={handleChange} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  placeholder="Référence FT" 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                    <Calendar className="w-4 h-4" />
+                    Date 
+                  </label>
+                  <input 
+                    type="date" 
+                    name="dateFT" 
+                    value={formData.dateFT} 
+                    onChange={handleChange} 
+                    className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4" />
+                    Heure 
+                  </label>
+                  <input 
+                    type="time" 
+                    name="heureFT" 
+                    value={formData.heureFT} 
+                    onChange={handleChange} 
+                    className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <FileText className="w-4 h-4" />
-              Contact 
-            </label>
-            <input 
-              type="text" 
-              name="contact" 
-              value={formData.contact} 
-              onChange={handleChange} 
-              placeholder="Numéro de téléphone" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-        </div>
-      </div>,
 
-      // Step 3 - Information du Terrain (vide - à remplir manuellement)
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <FileText className="w-4 h-4" />
-              Titre du terrain
-            </label>
-            <input 
-              type="text" 
-              name="titreTerrain" 
-              value={formData.titreTerrain} 
-              onChange={handleChange} 
-              placeholder="Titre de propriété ou référence" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <User className="w-4 h-4" />
-              Nom propriétaire
-            </label>
-            <input 
-              type="text" 
-              name="nomproprietaire" 
-              value={formData.nomproprietaire} 
-              onChange={handleChange} 
-              placeholder="Nom du propriétaire" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
+          <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+            <h3 className="font-medium text-[#0369a1] mb-3 flex items-center gap-2">
               <Map className="w-4 h-4" />
               Localisation
-            </label>
-            <input 
-              type="text" 
-              name="localisation" 
-              value={formData.localisation} 
-              onChange={handleChange} 
-              placeholder="Localisation précise du terrain" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Ruler className="w-4 h-4" />
-              Superficie (m²)
-            </label>
-            <input 
-              type="number" 
-              name="superficie" 
-              value={formData.superficie} 
-              onChange={handleChange} 
-              placeholder="Superficie en mètres carrés" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-        </div>
-      </div>,
-
-      // Step 4 - Motif et Détails (vide - à remplir manuellement)
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Target className="w-4 h-4" />
-              Motif
-            </label>
-            <input 
-              type="text" 
-              name="motif" 
-              value={formData.motif} 
-              onChange={handleChange} 
-              placeholder="Motif de la convocation" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <MapPin className="w-4 h-4" />
-              Lieu
-            </label>
-            <input 
-              type="text" 
-              name="lieu" 
-              value={formData.lieu} 
-              onChange={handleChange} 
-              placeholder="Lieu de la convocation" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-        </div>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <Target className="w-4 h-4" />
-              But
-            </label>
-            <input 
-              type="text" 
-              name="but" 
-              value={formData.but} 
-              onChange={handleChange} 
-              placeholder="But de la convocation" 
-              className="w-full border rounded-lg p-2 text-sm" 
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-2 mb-1">
-              <ClipboardList className="w-4 h-4" />
-              Mesure
-            </label>
-            <textarea 
-              name="mesure" 
-              value={formData.mesure} 
-              onChange={handleChange} 
-              placeholder="Mesures à prendre ou recommandations" 
-              rows={4} 
-              className="w-full border rounded-lg p-2 text-sm resize-none" 
-            />
-          </div>
-        </div>
-      </div>,
-
-      // Step 5 - Type de Dossier
-      <div className="max-h-[60vh] overflow-y-auto pr-2">
-        <div className="space-y-4">
-          {/* Champ pour définir les dossiers requis manuellement */}
-          {(!dossiersFromRdv || dossiersFromRdv.length === 0) && (
-            <div>
-              <label className="text-sm font-medium flex items-center gap-2 mb-1">
-                <FileText className="w-4 h-4" />
-                Définir les dossiers requis (optionnel)
-              </label>
-              <input 
-                type="text" 
-                name="manualDossiers" 
-                value={manualDossiers} 
-                onChange={handleChange} 
-                className="w-full border rounded-lg p-2 text-sm" 
-                placeholder="Entrez les dossiers requis, séparés par des virgules (ex: CSJ, Permis de Construction)"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Optionnel - Laissez vide si aucun dossier requis
-              </p>
-            </div>
-          )}
-
-          <label className="text-sm font-medium flex items-center gap-2 mb-3">
-            <Home className="w-4 h-4" />
-            Type de dossier (optionnel)
-            {(dossiersFromRdv.length > 0 || manualDossiers) && (
-              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                {(manualDossiers ? manualDossiers.split(',').map(d => d.trim()).filter(d => d) : dossiersFromRdv).length} dossier(s) requis
-              </span>
-            )}
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {dossierOptions.map(option => {
-              const requiredDossiers = manualDossiers ? manualDossiers.split(',').map(d => d.trim()).filter(d => d) : dossiersFromRdv;
-              const isPreSelected = requiredDossiers.includes(option);
-              const isSelected = formData.dossierType.includes(option);
-              return (
-                <label key={option} className={`flex items-center gap-3 border rounded-lg p-3 cursor-pointer hover:bg-gray-50 text-sm ${
-                  isPreSelected ? 'bg-blue-50 border-blue-200' : ''
-                } ${
-                  isPreSelected && !isSelected ? 'border-red-300 bg-red-50' : ''
-                }`}>
-                  <input 
-                    type="checkbox" 
-                    name="dossierType" 
-                    value={option} 
-                    checked={isSelected} 
-                    onChange={handleChange} 
-                    className="w-4 h-4 text-blue-600" 
-                  />
-                  <span className="text-gray-800">
-                    {option}
-                    {isPreSelected && (
-                      <span className={`text-xs ml-2 ${
-                        isSelected ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {isSelected ? '(fourni)' : '(manquant)'}
-                      </span>
-                    )}
-                  </span>
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <MapPin className="w-4 h-4" />
+                  Localité
                 </label>
-              );
-            })}
+                <input 
+                  type="text" 
+                  name="localite" 
+                  value={formData.localite} 
+                  onChange={handleChange} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  placeholder="Localité" 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                    <Target className="w-4 h-4" />
+                    Coord. X
+                  </label>
+                  <input 
+                    type="text" 
+                    name="coordX" 
+                    value={formData.coordX} 
+                    onChange={handleChange} 
+                    className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                    placeholder="X" 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                    <Target className="w-4 h-4" />
+                    Coord. Y
+                  </label>
+                  <input 
+                    type="text" 
+                    name="coordY" 
+                    value={formData.coordY} 
+                    onChange={handleChange} 
+                    className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                    placeholder="Y" 
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>,
+
+      // Step 1 - Personne & Terrain (fusion des étapes 2 et 3)
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full overflow-y-auto pr-2">
+        <div className="space-y-4">
+          <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+            <h3 className="font-medium text-[#0369a1] mb-3 flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Personne Convoquée
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <User className="w-4 h-4" />
+                  Type de personne
+                </label>
+                <select 
+                  name="typeConvoquee" 
+                  value={formData.typeConvoquee} 
+                  onChange={handleChange} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all"
+                >
+                  <option value="">Sélectionnez le type</option>
+                  <option value="proprietaire">Propriétaire</option>
+                  <option value="representant">Représentant</option>
+                  <option value="locataire">Locataire</option>
+                  <option value="occupant">Occupant</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <User className="w-4 h-4" />
+                  Nom complet 
+                </label>
+                <input 
+                  type="text" 
+                  name="nomComplet" 
+                  value={formData.nomComplet} 
+                  onChange={handleChange} 
+                  placeholder="Nom complet" 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                    <Hash className="w-4 h-4" />
+                    CIN 
+                  </label>
+                  <input 
+                    type="text" 
+                    name="cin" 
+                    value={formData.cin} 
+                    onChange={handleChange} 
+                    placeholder="CIN" 
+                    className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                    <FileText className="w-4 h-4" />
+                    Contact 
+                  </label>
+                  <input 
+                    type="text" 
+                    name="contact" 
+                    value={formData.contact} 
+                    onChange={handleChange} 
+                    placeholder="Téléphone" 
+                    className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <MapPin className="w-4 h-4" />
+                  Adresse 
+                </label>
+                <textarea 
+                  name="adresse" 
+                  value={formData.adresse} 
+                  onChange={handleChange} 
+                  placeholder="Adresse complète" 
+                  rows={2} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all resize-none" 
+                />
+              </div>
+            </div>
           </div>
         </div>
         
+        <div className="space-y-4">
+          <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+            <h3 className="font-medium text-[#0369a1] mb-3 flex items-center gap-2">
+              <Home className="w-4 h-4" />
+              Information du Terrain
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <FileText className="w-4 h-4" />
+                  Titre du terrain
+                </label>
+                <input 
+                  type="text" 
+                  name="titreTerrain" 
+                  value={formData.titreTerrain} 
+                  onChange={handleChange} 
+                  placeholder="Titre de propriété" 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <User className="w-4 h-4" />
+                  Nom propriétaire
+                </label>
+                <input 
+                  type="text" 
+                  name="nomproprietaire" 
+                  value={formData.nomproprietaire} 
+                  onChange={handleChange} 
+                  placeholder="Nom du propriétaire" 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <Map className="w-4 h-4" />
+                  Localisation
+                </label>
+                <input 
+                  type="text" 
+                  name="localisation" 
+                  value={formData.localisation} 
+                  onChange={handleChange} 
+                  placeholder="Localisation précise" 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <Ruler className="w-4 h-4" />
+                  Superficie (m²)
+                </label>
+                <input 
+                  type="number" 
+                  name="superficie" 
+                  value={formData.superficie} 
+                  onChange={handleChange} 
+                  placeholder="Superficie en m²" 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>,
+
+      // Step 2 - Détails & Validation (fusion des étapes 4 et 5)
+      <div className="h-full overflow-y-auto pr-2 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+            <h3 className="font-medium text-[#0369a1] mb-3 flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              Motif & Détails
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4" />
+                  Motif
+                </label>
+                <input 
+                  type="text" 
+                  name="motif" 
+                  value={formData.motif} 
+                  onChange={handleChange} 
+                  placeholder="Motif de la convocation" 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <MapPin className="w-4 h-4" />
+                  Lieu
+                </label>
+                <input 
+                  type="text" 
+                  name="lieu" 
+                  value={formData.lieu} 
+                  onChange={handleChange} 
+                  placeholder="Lieu de la convocation" 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4" />
+                  But
+                </label>
+                <input 
+                  type="text" 
+                  name="but" 
+                  value={formData.but} 
+                  onChange={handleChange} 
+                  placeholder="But de la convocation" 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+            <h3 className="font-medium text-[#0369a1] mb-3 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Mesures
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <ClipboardList className="w-4 h-4" />
+                  Mesure
+                </label>
+                <textarea 
+                  name="mesure" 
+                  value={formData.mesure} 
+                  onChange={handleChange} 
+                  placeholder="Mesures à prendre ou recommandations" 
+                  rows={4} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all resize-none" 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section Type de Dossier */}
+        <div className="bg-[#f0f9ff] p-4 rounded-xl border border-[#bae6fd]">
+          <div className="space-y-4">
+            {/* Champ pour définir les dossiers requis manuellement */}
+            {(!dossiersFromRdv || dossiersFromRdv.length === 0) && (
+              <div>
+                <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-2">
+                  <FileText className="w-4 h-4" />
+                  Définir les dossiers requis (optionnel)
+                </label>
+                <input 
+                  type="text" 
+                  name="manualDossiers" 
+                  value={manualDossiers} 
+                  onChange={handleChange} 
+                  className="w-full border border-[#bae6fd] rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9] focus:border-transparent transition-all" 
+                  placeholder="Entrez les dossiers requis, séparés par des virgules (ex: CSJ, Permis de Construction)"
+                />
+                <p className="text-xs text-[#0284c7] mt-2">
+                  Optionnel - Laissez vide si aucun dossier requis
+                </p>
+              </div>
+            )}
+
+            <label className="text-sm font-medium text-[#0369a1] flex items-center gap-2 mb-3">
+              <Home className="w-4 h-4" />
+              Type de dossier (optionnel)
+              {(dossiersFromRdv.length > 0 || manualDossiers) && (
+                <span className="text-xs text-[#0ea5e9] bg-white px-2 py-1 rounded-full border border-[#bae6fd]">
+                  {(manualDossiers ? manualDossiers.split(',').map(d => d.trim()).filter(d => d) : dossiersFromRdv).length} dossier(s) requis
+                </span>
+              )}
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {dossierOptions.map(option => {
+                const requiredDossiers = manualDossiers ? manualDossiers.split(',').map(d => d.trim()).filter(d => d) : dossiersFromRdv;
+                const isPreSelected = requiredDossiers.includes(option);
+                const isSelected = formData.dossierType.includes(option);
+                return (
+                  <label key={option} className={`flex items-center gap-3 border rounded-lg p-3 cursor-pointer hover:bg-white transition-colors text-sm ${
+                    isPreSelected ? 'bg-white border-[#bae6fd]' : 'border-[#bae6fd]'
+                  } ${
+                    isPreSelected && !isSelected ? 'border-[#fecaca] bg-[#fef2f2]' : ''
+                  }`}>
+                    <input 
+                      type="checkbox" 
+                      name="dossierType" 
+                      value={option} 
+                      checked={isSelected} 
+                      onChange={handleChange} 
+                      className="w-4 h-4 text-[#0ea5e9] border-2 border-[#7dd3fc] rounded" 
+                    />
+                    <span className="text-[#0c4a6e]">
+                      {option}
+                      {isPreSelected && (
+                        <span className={`text-xs ml-2 ${
+                          isSelected ? 'text-[#0ea5e9]' : 'text-[#dc2626]'
+                        }`}>
+                          {isSelected ? '(fourni)' : '(manquant)'}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {/* Section de statut final */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="font-medium text-sm mb-4 flex items-center gap-2">
+        <div className="bg-white p-4 rounded-xl border border-[#bae6fd] shadow-sm">
+          <h3 className="font-medium text-[#0369a1] mb-4 flex items-center gap-2">
             <FileText className="w-4 h-4" />
             Statut final du F.T.
           </h3>
           
           <div className={`p-3 rounded-lg mb-4 ${
-            statusInfo.type === 'success' ? 'bg-green-50 border border-green-200' :
-            statusInfo.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
-            'bg-blue-50 border border-blue-200'
+            statusInfo.type === 'success' ? 'bg-[#f0f9ff] border border-[#bae6fd]' :
+            statusInfo.type === 'warning' ? 'bg-[#fefce8] border border-[#fef08a]' :
+            'bg-[#f0f9ff] border border-[#bae6fd]'
           }`}>
             <div className="flex items-center gap-3">
               {statusInfo.type === 'success' ? (
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <CheckCircle2 className="w-5 h-5 text-[#0ea5e9]" />
               ) : statusInfo.type === 'warning' ? (
-                <AlertCircle className="w-5 h-5 text-yellow-600" />
+                <AlertCircle className="w-5 h-5 text-[#d97706]" />
               ) : (
-                <Info className="w-5 h-5 text-blue-600" />
+                <Info className="w-5 h-5 text-[#0ea5e9]" />
               )}
               <div>
                 <p className={`font-medium ${
-                  statusInfo.type === 'success' ? 'text-green-800' :
-                  statusInfo.type === 'warning' ? 'text-yellow-800' :
-                  'text-blue-800'
+                  statusInfo.type === 'success' ? 'text-[#0369a1]' :
+                  statusInfo.type === 'warning' ? 'text-[#92400e]' :
+                  'text-[#0369a1]'
                 }`}>
                   {statusInfo.title}
                 </p>
                 <p className={`text-sm ${
-                  statusInfo.type === 'success' ? 'text-green-700' :
-                  statusInfo.type === 'warning' ? 'text-yellow-700' :
-                  'text-blue-700'
+                  statusInfo.type === 'success' ? 'text-[#0284c7]' :
+                  statusInfo.type === 'warning' ? 'text-[#b45309]' :
+                  'text-[#0284c7]'
                 }`}>
                   {statusInfo.message}
                 </p>
@@ -1246,28 +1291,20 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
 
           {/* Affichage conditionnel des dossiers manquants */}
           {hasRequiredDossiers && missingDossiers.length > 0 && (
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <h4 className="font-medium text-sm text-yellow-800 mb-2 flex items-center gap-2">
+            <div className="mt-4 p-3 bg-[#fefce8] border border-[#fef08a] rounded-lg">
+              <h4 className="font-medium text-sm text-[#92400e] mb-2 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
                 Dossiers manquants ({missingDossiers.length})
               </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-yellow-700 border-collapse">
-                  <thead>
-                    <tr className="bg-yellow-100">
-                      <th className="border border-yellow-200 p-2 text-left font-medium">Dossier manquant</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {missingDossiers.map((dossier, index) => (
-                      <tr key={index} className="border border-yellow-200">
-                        <td className="p-2 font-medium">{dossier}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-2">
+                {missingDossiers.map((dossier, index) => (
+                  <div key={index} className="flex items-center gap-2 text-sm text-[#b45309]">
+                    <div className="w-2 h-2 bg-[#d97706] rounded-full"></div>
+                    <span>{dossier}</span>
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-yellow-600 mt-2">
+              <p className="text-xs text-[#d97706] mt-2">
                 ⚠️ Ces dossiers doivent être fournis pour pouvoir faire l'AP
               </p>
             </div>
@@ -1276,15 +1313,15 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
           {/* Délai pour complément */}
           {!isDossierComplete && hasRequiredDossiers && (
             <div className="mt-4">
-              <p className="text-sm font-medium mb-2">Choisir la durée pour compléter le dossier :</p>
-              <div className="flex gap-4">
+              <p className="text-sm font-medium text-[#0369a1] mb-2">Choisir la durée pour compléter le dossier :</p>
+              <div className="flex gap-3">
                 <button 
                   type="button"
                   onClick={() => handleDurationSelect('8')}
-                  className={`px-4 py-2 rounded-lg text-sm ${
+                  className={`px-4 py-2 rounded-lg text-sm transition-all ${
                     formData.durationComplement === '8' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                      ? 'bg-[#0ea5e9] text-white shadow-lg' 
+                      : 'bg-white text-[#0369a1] hover:bg-[#e0f2fe] border border-[#bae6fd]'
                   }`}
                 >
                   8 jours
@@ -1292,10 +1329,10 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
                 <button 
                   type="button"
                   onClick={() => handleDurationSelect('15')}
-                  className={`px-4 py-2 rounded-lg text-sm ${
+                  className={`px-4 py-2 rounded-lg text-sm transition-all ${
                     formData.durationComplement === '15' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                      ? 'bg-[#0ea5e9] text-white shadow-lg' 
+                      : 'bg-white text-[#0369a1] hover:bg-[#e0f2fe] border border-[#bae6fd]'
                   }`}
                 >
                   15 jours
@@ -1303,8 +1340,8 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
               </div>
               
               {formData.deadline && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800 font-medium">
+                <div className="mt-3 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-lg">
+                  <p className="text-sm text-[#0369a1] font-medium">
                     📅 Date limite pour compléter les dossiers manquants: 
                     <span className="ml-1">{new Date(formData.deadline).toLocaleDateString('fr-FR')}</span>
                   </p>
@@ -1315,17 +1352,17 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
 
           {/* Résumé des dossiers */}
           {hasRequiredDossiers && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-sm text-blue-800 mb-2">Résumé:</h4>
+            <div className="mt-4 p-3 bg-[#f0f9ff] border border-[#bae6fd] rounded-lg">
+              <h4 className="font-medium text-sm text-[#0369a1] mb-2">Résumé:</h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-blue-700">Dossiers requis: <span className="font-medium">{requiredDossiers.length}</span></p>
-                  <p className="text-blue-700">Dossiers fournis: <span className="font-medium">{formData.dossierType.length}</span></p>
+                  <p className="text-[#0284c7]">Dossiers requis: <span className="font-medium text-[#0369a1]">{requiredDossiers.length}</span></p>
+                  <p className="text-[#0284c7]">Dossiers fournis: <span className="font-medium text-[#0369a1]">{formData.dossierType.length}</span></p>
                 </div>
                 <div>
-                  <p className="text-blue-700">Dossiers manquants: <span className="font-medium">{missingDossiers.length}</span></p>
-                  <p className="text-blue-700">Complétude: <span className={`font-medium ${
-                    isDossierComplete ? 'text-green-600' : 'text-red-600'
+                  <p className="text-[#0284c7]">Dossiers manquants: <span className="font-medium text-[#0369a1]">{missingDossiers.length}</span></p>
+                  <p className="text-[#0284c7]">Complétude: <span className={`font-medium ${
+                    isDossierComplete ? 'text-[#0ea5e9]' : 'text-[#dc2626]'
                   }`}>
                     {isDossierComplete ? '100%' : `${Math.round((formData.dossierType.length / requiredDossiers.length) * 100)}%`}
                   </span></p>
@@ -1336,25 +1373,25 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
 
           {/* Affichage des erreurs API */}
           {apiError && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <h4 className="font-medium text-sm text-red-800 mb-2 flex items-center gap-2">
+            <div className="mt-4 p-3 bg-[#fef2f2] border border-[#fecaca] rounded-lg">
+              <h4 className="font-medium text-sm text-[#dc2626] mb-2 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
                 Erreur de connexion
               </h4>
-              <p className="text-sm text-red-700">{apiError}</p>
-              <p className="text-xs text-red-600 mt-2">
+              <p className="text-sm text-[#dc2626]">{apiError}</p>
+              <p className="text-xs text-[#dc2626] mt-2">
                 💡 Solution: Vérifiez que le serveur backend est démarré sur http://localhost:3000
               </p>
             </div>
           )}
 
           {/* Bouton de validation */}
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h4 className="font-medium text-sm text-green-800 mb-3 flex items-center gap-2">
+          <div className="mt-6 p-4 bg-white border border-[#bae6fd] rounded-lg shadow-sm">
+            <h4 className="font-medium text-sm text-[#0369a1] mb-3 flex items-center gap-2">
               <CheckCircle className="w-4 h-4" />
               Validation finale du F.T.
             </h4>
-            <p className="text-sm text-green-700 mb-4">
+            <p className="text-sm text-[#0284c7] mb-4">
               {hasRequiredDossiers 
                 ? 'Vérifiez que toutes les informations sont correctes avant de valider définitivement la Fiche de Travail.'
                 : 'Aucun dossier requis identifié. Vous pouvez valider le F.T. sans restriction.'
@@ -1365,20 +1402,21 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
               <button
                 type="button"
                 onClick={showValidation}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                className="px-6 py-3 bg-[#0ea5e9] text-white rounded-lg hover:bg-[#0284c7] transition-colors font-medium flex items-center gap-2 shadow-lg hover:shadow-xl"
               >
                 <CheckCircle className="w-5 h-5" />
                 Afficher le bouton de validation
               </button>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-green-800 font-medium">
+                <p className="text-sm text-[#0369a1] font-medium">
                   ✅ Vous pouvez maintenant valider la Fiche de Travail
                 </p>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={openConfirmationModal}
                   disabled={isSubmitting}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors font-medium flex items-center gap-2 w-full justify-center"
+                  className="px-6 py-3 bg-[#0ea5e9] text-white rounded-lg hover:bg-[#0284c7] disabled:bg-gray-400 transition-colors font-medium flex items-center gap-2 w-full justify-center shadow-lg hover:shadow-xl"
                 >
                   {isSubmitting ? (
                     <>
@@ -1392,7 +1430,7 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
                     </>
                   )}
                 </button>
-                <p className="text-xs text-green-600">
+                <p className="text-xs text-[#0284c7]">
                   ⚠️ Attention : Cette action est irréversible. Le F.T. sera enregistré dans la base de données.
                 </p>
               </div>
@@ -1405,11 +1443,11 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
     return fields[currentStep];
   };
 
-  // Composant pour le contenu PDF APIPA (version simplifiée pour l'affichage)
+  // Composant pour le contenu PDF APIPA
   const APIPAPDFContent = () => {
     return (
       <div 
-        className="pdf-preview bg-white p-8 max-w-4xl mx-auto border border-gray-300 shadow-lg"
+        className="pdf-preview bg-white p-8 max-w-4xl mx-auto border border-[#bae6fd] shadow-lg rounded-xl"
         style={{ 
           fontFamily: 'Times New Roman, serif',
           fontSize: '12px',
@@ -1422,25 +1460,85 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
     );
   };
 
+  // Modal de confirmation
+  const renderConfirmationModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-20 overflow-y-auto h-full w-full z-[3000] flex justify-center items-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-[#bae6fd]">
+        <div className="flex items-center justify-between p-6 border-b border-[#e0f2fe]">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-full bg-[#e0f2fe]">
+              <AlertCircle className="w-6 h-6 text-[#0284c7]" />
+            </div>
+            <h3 className="text-lg font-semibold text-[#0c4a6e]">Confirmer la création</h3>
+          </div>
+          <button 
+            onClick={() => setShowConfirmationModal(false)} 
+            className="p-2 text-[#38bdf8] hover:text-[#0284c7] transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <p className="text-[#0369a1] mb-2">Êtes-vous sûr de vouloir créer cette Fiche de Travail ?</p>
+          <div className="bg-[#f0f9ff] border border-[#bae6fd] rounded-lg p-4 mt-4">
+            <h4 className="font-medium text-[#075985] mb-2">Résumé du F.T. :</h4>
+            <div className="text-sm text-[#0369a1] space-y-1">
+              <p><span className="font-medium">Référence :</span> {formData.referenceFT}</p>
+              <p><span className="font-medium">Date :</span> {formData.dateFT}</p>
+              <p><span className="font-medium">Personne :</span> {formData.nomComplet}</p>
+              <p><span className="font-medium">Statut :</span> {getStatusMessage().title}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3 p-6 border-t border-[#e0f2fe] bg-[#f0f9ff] rounded-b-2xl">
+          <button
+            onClick={() => setShowConfirmationModal(false)}
+            className="px-4 py-2 border border-[#7dd3fc] text-[#0369a1] rounded-lg hover:bg-[#e0f2fe] transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={confirmSubmit}
+            disabled={isSubmitting}
+            className={`px-6 py-2 bg-[#0ea5e9] text-white rounded-lg hover:bg-[#0284c7] transition-colors ${
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            {isSubmitting ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Enregistrement...</span>
+              </div>
+            ) : (
+              'Confirmer'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   // Modal de succès avec option PDF
   const renderSuccessModal = () => {
     const statusInfo = getStatusMessage();
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-auto">
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+      <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-auto border border-[#bae6fd]">
+          <div className="flex items-center justify-between p-6 border-b border-[#e0f2fe]">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-green-100">
-                <CheckCircle className="w-6 h-6 text-green-600" />
+              <div className="p-2 rounded-full bg-[#e0f2fe]">
+                <CheckCircle className="w-6 h-6 text-[#0ea5e9]" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900">
+              <h3 className="text-xl font-semibold text-[#0c4a6e]">
                 F.T. Créé avec Succès
               </h3>
             </div>
             <button
               onClick={handleSuccessModalClose}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="p-2 text-[#38bdf8] hover:text-[#0284c7] transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1448,29 +1546,29 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
 
           <div className="p-6">
             <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-                <CheckCircle className="h-6 w-6 text-green-600" />
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-[#e0f2fe] mb-4">
+                <CheckCircle className="h-6 w-6 text-[#0ea5e9]" />
               </div>
               
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-[#0c4a6e] mb-2">
                 Fiche de Travail Validée
               </h3>
               
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-[#0369a1] mb-4">
                 La fiche de travail a été créée avec succès et enregistrée dans le système.
               </p>
 
               {createdFT && (
-                <div className="bg-gray-50 rounded-lg p-4 mb-4 text-left">
-                  <h4 className="font-medium text-gray-900 mb-2">Détails du F.T. :</h4>
-                  <div className="space-y-1 text-sm text-gray-600">
+                <div className="bg-[#f0f9ff] rounded-xl p-4 mb-4 text-left border border-[#bae6fd]">
+                  <h4 className="font-medium text-[#075985] mb-2">Détails du F.T. :</h4>
+                  <div className="space-y-1 text-sm text-[#0369a1]">
                     <p><span className="font-medium">Référence :</span> {createdFT.reference_ft}</p>
                     <p><span className="font-medium">Date :</span> {new Date(createdFT.date_ft).toLocaleDateString('fr-FR')}</p>
                     <p><span className="font-medium">Personne :</span> {createdFT.nom_complet}</p>
                     <p><span className="font-medium">Statut :</span> <span className={
-                      createdFT.status_dossier === 'regularise' ? 'text-green-600 font-medium' :
-                      createdFT.status_dossier === 'irregularise' ? 'text-red-600 font-medium' :
-                      'text-blue-600 font-medium'
+                      createdFT.status_dossier === 'regularise' ? 'text-[#0ea5e9] font-medium' :
+                      createdFT.status_dossier === 'irregularise' ? 'text-[#dc2626] font-medium' :
+                      'text-[#0ea5e9] font-medium'
                     }>
                       {createdFT.status_dossier === 'regularise' ? 'RÉGULARISÉ' : 
                        createdFT.status_dossier === 'irregularise' ? 'IRRÉGULARISÉ' : 
@@ -1483,7 +1581,7 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
               <div className="space-y-3">
                 <button
                   onClick={handleGeneratePDF}
-                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+                  className="w-full px-4 py-3 bg-[#0ea5e9] text-white rounded-lg hover:bg-[#0284c7] transition-colors font-medium flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
                 >
                   <Download className="w-5 h-5" />
                   Générer F.T APIPA
@@ -1491,7 +1589,7 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
                 
                 <button
                   onClick={handleSuccessModalClose}
-                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full px-4 py-2 border border-[#7dd3fc] text-[#0369a1] rounded-lg hover:bg-[#e0f2fe] transition-colors"
                 >
                   Retour à la liste
                 </button>
@@ -1505,33 +1603,33 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
 
   // Modal pour visualiser et télécharger le PDF
   const renderPdfModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-auto max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full mx-auto max-h-[90vh] flex flex-col border border-[#bae6fd]">
+        <div className="flex items-center justify-between p-6 border-b border-[#e0f2fe]">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-blue-100">
-              <FileText className="w-6 h-6 text-blue-600" />
+            <div className="p-2 rounded-full bg-[#e0f2fe]">
+              <FileText className="w-6 h-6 text-[#0ea5e9]" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900">
+            <h3 className="text-xl font-semibold text-[#0c4a6e]">
               Aperçu - F.T APIPA
             </h3>
           </div>
           <button
             onClick={() => setShowPdfModal(false)}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-2 text-[#38bdf8] hover:text-[#0284c7] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-4 bg-gray-100">
+        <div className="flex-1 overflow-auto p-4 bg-white">
           <APIPAPDFContent />
         </div>
 
-        <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-white">
+        <div className="flex justify-between items-center p-6 border-t border-[#e0f2fe] bg-white">
           <button
             onClick={() => setShowPdfModal(false)}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 border border-[#7dd3fc] text-[#0369a1] rounded-lg hover:bg-[#e0f2fe] transition-colors"
           >
             Retour
           </button>
@@ -1541,13 +1639,13 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
                 setShowPdfModal(false);
                 handleSuccessModalClose();
               }}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-[#7dd3fc] text-[#0369a1] rounded-lg hover:bg-[#e0f2fe] transition-colors"
             >
               Terminer
             </button>
             <button
               onClick={handleDownloadPDF}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+              className="px-6 py-2 bg-[#0ea5e9] text-white rounded-lg hover:bg-[#0284c7] transition-colors font-medium flex items-center gap-2 shadow-lg hover:shadow-xl"
             >
               <Download className="w-5 h-5" />
               Télécharger le PDF
@@ -1560,55 +1658,76 @@ function FaireFT({ rendezvousData, onFTComplete }: FaireFTProps) {
 
   return (
     <>
-      <div className="bg-white border shadow-sm p-4 max-h-[90vh] flex flex-col">
+      {/* Toasts */}
+      {toasts.map(toast => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
+
+      {/* Container principal avec hauteur adaptée pour la modal */}
+      <div className="bg-white border border-[#e0f2fe] shadow-sm rounded-2xl p-6 h-full flex flex-col">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="font-semibold text-lg text-gray-800 flex items-center gap-2">
-            {React.createElement(steps[currentStep].icon, { className: 'w-5 h-5' })}
-            Étape {currentStep + 1} sur {steps.length} : {steps[currentStep].title}
-          </h2>
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-xl bg-[#e0f2fe]">
+              {React.createElement(steps[currentStep].icon, { className: 'w-5 h-5 text-[#0284c7]' })}
+            </div>
+            <div>
+              <h2 className="font-semibold text-lg text-[#0c4a6e]">
+                Étape {currentStep + 1} sur {steps.length} : {steps[currentStep].title}
+              </h2>
+              <p className="text-sm text-[#0284c7] mt-1">
+                Création de Fiche de Travail pour {rendezvousData.nom_personne_r}
+              </p>
+            </div>
+          </div>
+          {/* Pagination réduite */}
           <div className="flex gap-1">
             {steps.map((_, i) => (
-              <div key={i} className={`w-2 h-2 rounded-full ${i === currentStep ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+              <div key={i} className={`w-3 h-1 rounded-full ${i === currentStep ? 'bg-[#0ea5e9]' : 'bg-[#e0f2fe]'}`}></div>
             ))}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
-          <div className="flex-1 min-h-0">
-            {renderStepContent()}
-          </div>
+        {/* Contenu du formulaire avec hauteur flexible */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {renderStepContent()}
+        </div>
 
-          {/* Navigation */}
-          <div className="flex justify-between items-center mt-6 border-t pt-4">
+        {/* Navigation */}
+        <div className="flex justify-between items-center mt-6 border-t border-[#e0f2fe] pt-4">
+          <button 
+            type="button" 
+            onClick={() => setCurrentStep(currentStep - 1)} 
+            disabled={currentStep === 0 || isSubmitting} 
+            className="px-4 py-2 border border-[#7dd3fc] rounded-lg flex items-center gap-2 text-[#0369a1] hover:bg-[#e0f2fe] disabled:opacity-50 text-sm transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" /> Précédent
+          </button>
+
+          {currentStep < steps.length - 1 ? (
             <button 
               type="button" 
-              onClick={() => setCurrentStep(currentStep - 1)} 
-              disabled={currentStep === 0 || isSubmitting} 
-              className="px-4 py-2 border rounded-lg flex items-center gap-2 text-gray-700 hover:bg-gray-100 disabled:opacity-50 text-sm"
+              onClick={() => setCurrentStep(currentStep + 1)} 
+              disabled={!isStepValid() || isSubmitting} 
+              className="px-4 py-2 bg-[#0ea5e9] text-white rounded-lg flex items-center gap-2 hover:bg-[#0284c7] disabled:bg-gray-400 text-sm transition-colors shadow-lg hover:shadow-xl"
             >
-              <ChevronLeft className="w-4 h-4" /> Précédent
+              Suivant <ChevronRight className="w-4 h-4" />
             </button>
-
-            {currentStep < steps.length - 1 ? (
-              <button 
-                type="button" 
-                onClick={() => setCurrentStep(currentStep + 1)} 
-                disabled={!isStepValid() || isSubmitting} 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 disabled:bg-gray-400 text-sm"
-              >
-                Suivant <ChevronRight className="w-4 h-4" />
-              </button>
-            ) : (
-              !showValidationButton && (
-                <div className="text-sm text-gray-500">
-                  Cliquez sur "Afficher le bouton de validation" pour valider le F.T.
-                </div>
-              )
-            )}
-          </div>
-        </form>
+          ) : (
+            !showValidationButton && (
+              <div className="text-sm text-[#0284c7]">
+                Cliquez sur "Afficher le bouton de validation" pour valider le F.T.
+              </div>
+            )
+          )}
+        </div>
       </div>
 
+      {showConfirmationModal && renderConfirmationModal()}
       {showSuccessModal && renderSuccessModal()}
       {showPdfModal && renderPdfModal()}
     </>

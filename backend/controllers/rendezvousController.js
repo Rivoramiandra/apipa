@@ -2,6 +2,42 @@
 import RendezvousModel from '../models/rendezvousModel.js';
 
 class RendezvousController {
+  // Créer un rendez-vous à partir d'une descente
+  createFromDescente = async (req, res) => {
+    try {
+      const { descenteId } = req.params;
+      const descenteData = req.body;
+
+      // Vérifier si la descente a déjà un rendez-vous
+      const hasRendezvous = await RendezvousModel.checkDescenteHasRendezvous(descenteId);
+      
+      if (hasRendezvous) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cette descente a déjà un rendez-vous associé'
+        });
+      }
+
+      const rendezvous = await RendezvousModel.createFromDescente({
+        n: descenteId,
+        ...descenteData
+      });
+
+      res.status(201).json({
+        success: true,
+        data: rendezvous,
+        message: 'Rendez-vous créé avec succès'
+      });
+    } catch (error) {
+      console.error('Erreur dans createFromDescente:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la création du rendez-vous',
+        error: error.message
+      });
+    }
+  }
+
   // Récupérer tous les rendez-vous
   getAllRendezvous = async (req, res) => {
     try {
@@ -48,6 +84,115 @@ class RendezvousController {
     }
   }
 
+  // Récupérer les rendez-vous par ID de descente
+  getRendezvousByDescenteId = async (req, res) => {
+    try {
+      const { descenteId } = req.params;
+      const rendezvous = await RendezvousModel.getRendezvousByDescenteId(descenteId);
+      
+      res.json({
+        success: true,
+        data: rendezvous,
+        count: rendezvous.length
+      });
+    } catch (error) {
+      console.error('Erreur dans getRendezvousByDescenteId:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la récupération des rendez-vous de la descente',
+        error: error.message
+      });
+    }
+  }
+
+  // Vérifier si une descente a un rendez-vous
+  checkDescenteHasRendezvous = async (req, res) => {
+    try {
+      const { descenteId } = req.params;
+      const hasRendezvous = await RendezvousModel.checkDescenteHasRendezvous(descenteId);
+      
+      res.json({
+        success: true,
+        data: { hasRendezvous },
+        message: hasRendezvous 
+          ? 'Cette descente a déjà un rendez-vous' 
+          : 'Cette descente n\'a pas de rendez-vous'
+      });
+    } catch (error) {
+      console.error('Erreur dans checkDescenteHasRendezvous:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la vérification',
+        error: error.message
+      });
+    }
+  }
+
+  // Mettre à jour le statut d'un rendez-vous
+  updateStatut = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { statut } = req.body;
+
+      if (!statut) {
+        return res.status(400).json({
+          success: false,
+          message: 'Le champ statut est requis'
+        });
+      }
+
+      const updated = await RendezvousModel.updateStatut(id, statut);
+
+      res.json({
+        success: true,
+        data: updated,
+        message: 'Statut mis à jour avec succès'
+      });
+    } catch (error) {
+      console.error('Erreur dans updateStatut:', error);
+      if (error.message === 'Rendez-vous non trouvé') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la mise à jour du statut',
+        error: error.message
+      });
+    }
+  }
+
+  // Mettre à jour complètement un rendez-vous
+  updateRendezvous = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const rendezvousData = req.body;
+
+      const updated = await RendezvousModel.update(id, rendezvousData);
+
+      res.json({
+        success: true,
+        data: updated,
+        message: 'Rendez-vous mis à jour avec succès'
+      });
+    } catch (error) {
+      console.error('Erreur dans updateRendezvous:', error);
+      if (error.message === 'Rendez-vous non trouvé') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la mise à jour du rendez-vous',
+        error: error.message
+      });
+    }
+  }
+
   // Rechercher des rendez-vous
   searchRendezvous = async (req, res) => {
     try {
@@ -78,44 +223,7 @@ class RendezvousController {
     }
   }
 
-  // Mettre à jour le statut
-  updateStatut = async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { statut } = req.body;
-
-      if (!statut) {
-        return res.status(400).json({
-          success: false,
-          message: 'Le champ statut est requis'
-        });
-      }
-
-      const updated = await RendezvousModel.updateStatut(id, statut);
-
-      if (!updated) {
-        return res.status(404).json({
-          success: false,
-          message: 'Rendez-vous non trouvé'
-        });
-      }
-
-      res.json({
-        success: true,
-        data: updated,
-        message: 'Statut mis à jour avec succès'
-      });
-    } catch (error) {
-      console.error('Erreur dans updateStatut:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Erreur serveur lors de la mise à jour du statut',
-        error: error.message
-      });
-    }
-  }
-
-  // Récupérer les statistiques
+  // Récupérer les statistiques des rendez-vous
   getRendezvousStats = async (req, res) => {
     try {
       const stats = await RendezvousModel.getRendezvousStats();
@@ -133,6 +241,7 @@ class RendezvousController {
       });
     }
   }
+
   // Envoyer une mise en demeure
   sendMiseEnDemeure = async (req, res) => {
     try {
@@ -244,6 +353,52 @@ class RendezvousController {
       });
     }
   }
+
+  // Supprimer un rendez-vous
+  deleteRendezvous = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await RendezvousModel.delete(id);
+
+      res.json({
+        success: true,
+        data: deleted,
+        message: 'Rendez-vous supprimé avec succès'
+      });
+    } catch (error) {
+      console.error('Erreur dans deleteRendezvous:', error);
+      if (error.message === 'Rendez-vous non trouvé') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la suppression du rendez-vous',
+        error: error.message
+      });
+    }
+  }
+
+  // Récupérer les statuts disponibles
+  getAvailableStatuts = async (req, res) => {
+    try {
+      const statuts = await RendezvousModel.getAvailableStatuts();
+      
+      res.json({
+        success: true,
+        data: statuts
+      });
+    } catch (error) {
+      console.error('Erreur dans getAvailableStatuts:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de la récupération des statuts',
+        error: error.message
+      });
+    }
+  }
 }
 
-export default new RendezvousController;
+export default new RendezvousController();

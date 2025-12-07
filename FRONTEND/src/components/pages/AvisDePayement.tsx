@@ -35,35 +35,43 @@ import MiseEnDemeureNonPaiement from './MiseEnDemeureNonPaiement';
 export interface APData {
   // Champs de base
   id: number;
-  id_ft_table: number;
+  id_ft: number;
   reference_ft: string;
   date_ft: string;
   heure_ft: string;
-  infraction: string;
   status_dossier: string;
-  statut: 'en cours' | 'traité' | 'archivé' | 'annulé' | 'en attente de paiement' | 'non comparution';
+  statut: 'En attente' | 'en cours' | 'traité' | 'archivé' | 'annulé' | 'en attente de paiement' | 'non comparution';
  
   // Informations AP
   num_ap: string;
   date_ap: string;
-  date_descente: string;
  
   // Informations terrain
   titre_terrain: string;
   superficie: number;
-  localite: string;
   zone_geographique: string;
   pu_plan_urbanisme: string;
   destination_terrain: string;
- 
+  
+  // Coordonnées géographiques - AJOUT DES COLONNES
+  coord_x: number | null;
+  coord_y: number | null;
+  
   // Informations paiement
-  delai_payment: string | { days: number };
+  delai_payment: number | string;
   date_delai_payment: string;
   contact: string;
   
   // Timestamps
   created_at: string;
-  updated_at: string;
+  update_at: string;
+  
+  // Champs optionnels
+  montant_chiffre?: number;
+  montant_lettre?: string;
+  date_mise_a_jour?: string;
+  last_payment_date?: string;
+  notes?: string;
 }
 
 // Interface pour la réponse API
@@ -107,7 +115,7 @@ interface PaginationState {
 
 const ViewModal: React.FC<{ ap: APData | null, onClose: () => void, formatters: any }> = ({ ap, onClose, formatters }) => {
   if (!ap) return null;
-  const { formatDate, formatTime, getStatutBadge, translateStatut, formatSuperficie, formatDelaiPayment } = formatters;
+  const { formatDate, formatTime, getStatutBadge, translateStatut, formatSuperficie, formatDelaiPayment, formatCoordonnees } = formatters;
   
   const DetailItem: React.FC<{ icon: JSX.Element, label: string, value: any }> = ({ icon, label, value }) => (
     <div className="flex items-start text-sm text-gray-700 space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
@@ -143,13 +151,12 @@ const ViewModal: React.FC<{ ap: APData | null, onClose: () => void, formatters: 
             <h4 className="text-lg font-bold text-blue-600 border-b border-blue-100 pb-2">Informations Générales</h4>
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
               <DetailItem icon={<FileText className="w-5 h-5" />} label="ID AP" value={ap.id} />
-              <DetailItem icon={<FileText className="w-5 h-5" />} label="ID FT" value={ap.id_ft_table} />
+              <DetailItem icon={<FileText className="w-5 h-5" />} label="ID FT" value={ap.id_ft} />
               <DetailItem icon={<FileText className="w-5 h-5" />} label="Référence FT" value={ap.reference_ft} />
               <DetailItem icon={<FileText className="w-5 h-5" />} label="Numéro AP" value={ap.num_ap || 'Non attribué'} />
               <DetailItem icon={<Calendar className="w-5 h-5" />} label="Date du FT" value={formatDate(ap.date_ft)} />
               <DetailItem icon={<Clock className="w-5 h-5" />} label="Heure du FT" value={formatTime(ap.heure_ft)} />
               <DetailItem icon={<Calendar className="w-5 h-5" />} label="Date AP" value={formatDate(ap.date_ap)} />
-              <DetailItem icon={<Calendar className="w-5 h-5" />} label="Date Descente" value={formatDate(ap.date_descente)} />
               <DetailItem icon={<Info className="w-5 h-5" />} label="Status Dossier" value={ap.status_dossier || 'Non spécifié'} />
               <div className='sm:col-span-2 lg:col-span-3'>
                 <DetailItem
@@ -171,10 +178,20 @@ const ViewModal: React.FC<{ ap: APData | null, onClose: () => void, formatters: 
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
               <DetailItem icon={<FileText className="w-5 h-5" />} label="Titre Terrain" value={ap.titre_terrain || 'Non spécifié'} />
               <DetailItem icon={<Ruler className="w-5 h-5" />} label="Superficie" value={formatSuperficie(ap.superficie)} />
-              <DetailItem icon={<MapPin className="w-5 h-5" />} label="Localité" value={ap.localite || 'Non spécifié'} />
               <DetailItem icon={<MapPin className="w-5 h-5" />} label="Zone Géographique" value={ap.zone_geographique || 'Non spécifié'} />
               <DetailItem icon={<Map className="w-5 h-5" />} label="Plan d'Urbanisme" value={ap.pu_plan_urbanisme || 'Non spécifié'} />
               <DetailItem icon={<Building className="w-5 h-5" />} label="Destination Terrain" value={ap.destination_terrain || 'Non spécifié'} />
+              {/* AJOUT DES COORDONNÉES DANS LE MODAL */}
+              <DetailItem 
+                icon={<MapPin className="w-5 h-5" />} 
+                label="Coordonnées X" 
+                value={formatCoordonnees(ap.coord_x)} 
+              />
+              <DetailItem 
+                icon={<MapPin className="w-5 h-5" />} 
+                label="Coordonnées Y" 
+                value={formatCoordonnees(ap.coord_y)} 
+              />
             </div>
           </div>
 
@@ -182,8 +199,16 @@ const ViewModal: React.FC<{ ap: APData | null, onClose: () => void, formatters: 
           <div className="md:col-span-2 space-y-4 border-b pb-4">
             <h4 className="text-lg font-bold text-blue-600 border-b border-blue-100 pb-2">Informations Paiement</h4>
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
-              <DetailItem icon={<Calendar className="w-5 h-5" />} label="Délai Paiement (Interval)" value={formatDelaiPayment(ap.delai_payment)} />
+              <DetailItem icon={<Calendar className="w-5 h-5" />} label="Délai Paiement" value={formatDelaiPayment(ap.delai_payment)} />
               <DetailItem icon={<Calendar className="w-5 h-5" />} label="Date Délai Paiement" value={ap.date_delai_payment ? formatDate(ap.date_delai_payment) : 'Non spécifié'} />
+              <DetailItem icon={<DollarSign className="w-5 h-5" />} label="Montant" value={ap.montant_chiffre ? `${ap.montant_chiffre.toLocaleString()} Ar` : 'Non spécifié'} />
+              {ap.montant_lettre && (
+                <DetailItem 
+                  icon={<FileText className="w-5 h-5" />} 
+                  label="Montant en lettres" 
+                  value={ap.montant_lettre} 
+                />
+              )}
             </div>
           </div>
 
@@ -192,18 +217,28 @@ const ViewModal: React.FC<{ ap: APData | null, onClose: () => void, formatters: 
             <h4 className="text-lg font-bold text-blue-600 border-b border-blue-100 pb-2">Historique</h4>
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
               <DetailItem icon={<Calendar className="w-5 h-5" />} label="Date de Création" value={formatDate(ap.created_at)} />
-              <DetailItem icon={<Calendar className="w-5 h-5" />} label="Dernière Modification" value={formatDate(ap.updated_at)} />
+              <DetailItem icon={<Calendar className="w-5 h-5" />} label="Dernière Modification" value={formatDate(ap.update_at)} />
+              {ap.date_mise_a_jour && (
+                <DetailItem icon={<Calendar className="w-5 h-5" />} label="Date Mise à Jour" value={formatDate(ap.date_mise_a_jour)} />
+              )}
             </div>
           </div>
 
-          {/* Section V: Infraction */}
+          {/* Section V: Contact */}
           <div className="md:col-span-2 space-y-4">
-            <h4 className="text-lg font-bold text-blue-600 border-b border-blue-100 pb-2">Infraction</h4>
+            <h4 className="text-lg font-bold text-blue-600 border-b border-blue-100 pb-2">Contact</h4>
             <DetailItem
-              icon={<AlertCircle className="w-5 h-5" />}
-              label="Description de l'infraction"
-              value={ap.infraction || 'Aucune infraction spécifiée'}
+              icon={<MapPin className="w-5 h-5" />}
+              label="Contact"
+              value={ap.contact || 'Non spécifié'}
             />
+            {ap.notes && (
+              <DetailItem
+                icon={<AlertCircle className="w-5 h-5" />}
+                label="Notes"
+                value={ap.notes}
+              />
+            )}
           </div>
         </div>
 
@@ -297,6 +332,10 @@ const ListeAP: React.FC = () => {
     // Fonction pour obtenir la couleur du badge selon le statut
     const getStatutBadge = (statut: string) => {
       const styles = {
+        'En attente': {
+          color: 'bg-gray-100 text-gray-800 border-gray-200',
+          icon: <Clock className="w-5 h-5 text-gray-600" />
+        },
         'en cours': {
           color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
           icon: <Clock className="w-5 h-5 text-yellow-600" />
@@ -332,7 +371,8 @@ const ListeAP: React.FC = () => {
     // Fonction pour traduire le statut
     const translateStatut = (statut: string) => {
       const translations: { [key: string]: string } = {
-        'en cours': 'En cours',
+        'En attente': 'En attente',
+        'en cours': 'En Cours',
         'traité': 'Traité',
         'archivé': 'Archivé',
         'annulé': 'Annulé',
@@ -384,8 +424,19 @@ const ListeAP: React.FC = () => {
         return delai;
       } else if (delai && typeof delai === 'object' && 'days' in delai) {
         return `${delai.days} jours`;
+      } else if (typeof delai === 'number') {
+        return `${delai} jours`;
       }
       return 'Non spécifié';
+    };
+
+    // Formater les coordonnées - NOUVELLE FONCTION
+    const formatCoordonnees = (coord: number | null): string => {
+      if (coord === null || coord === undefined) return 'Non spécifié';
+      return new Intl.NumberFormat('fr-FR', {
+        minimumFractionDigits: 6,
+        maximumFractionDigits: 6
+      }).format(coord);
     };
 
     return {
@@ -394,7 +445,8 @@ const ListeAP: React.FC = () => {
       formatDate,
       formatTime,
       formatSuperficie,
-      formatDelaiPayment
+      formatDelaiPayment,
+      formatCoordonnees // AJOUT DE LA FONCTION
     };
   }, []);
 
@@ -404,7 +456,8 @@ const ListeAP: React.FC = () => {
     formatDate,
     formatTime,
     formatSuperficie,
-    formatDelaiPayment
+    formatDelaiPayment,
+    formatCoordonnees
   } = formatters;
 
   /* ---------------------------- Fonctions de Fetch --------------------------- */
@@ -417,10 +470,11 @@ const ListeAP: React.FC = () => {
     
       console.log('🔄 Tentative de récupération des AP...');
     
-      // Essayer les deux endpoints possibles
+      // Endpoints pour avisdepaiment
       const endpoints = [
-        'http://localhost:3000/api/faireap',
-        'http://localhost:3000/api/aps'
+        'http://localhost:3000/api/avisdepaiment',
+        'http://localhost:3000/api/aps',
+        'http://localhost:3000/api/faireap'
       ];
     
       let response = null;
@@ -449,24 +503,55 @@ const ListeAP: React.FC = () => {
       }
     
       if (data.success) {
-        setApList(data.data);
+        // Formater les données pour correspondre à l'interface
+        const formattedData: APData[] = data.data.map((ap: any) => ({
+          id: ap.id,
+          id_ft: ap.id_ft,
+          reference_ft: ap.reference_ft,
+          date_ft: ap.date_ft,
+          heure_ft: ap.heure_ft,
+          status_dossier: ap.status_dossier,
+          statut: ap.statut,
+          created_at: ap.created_at,
+          num_ap: ap.num_ap,
+          date_ap: ap.date_ap,
+          titre_terrain: ap.titre_terrain,
+          superficie: ap.superficie,
+          zone_geographique: ap.zone_geographique,
+          pu_plan_urbanisme: ap.pu_plan_urbanisme,
+          destination_terrain: ap.destination_terrain,
+          // AJOUT DES COORDONNÉES DANS LE MAPPING
+          coord_x: ap.coord_x,
+          coord_y: ap.coord_y,
+          delai_payment: ap.delai_payment,
+          date_delai_payment: ap.date_delai_payment,
+          contact: ap.contact,
+          update_at: ap.update_at,
+          montant_chiffre: ap.montant_chiffre,
+          montant_lettre: ap.montant_lettre,
+          date_mise_a_jour: ap.date_mise_a_jour,
+          last_payment_date: ap.last_payment_date,
+          notes: ap.notes
+        }));
+        
+        setApList(formattedData);
       
-        // Calcul des statistiques
-        const avecInfraction = data.data.filter((ap: APData) =>
-          ap.infraction && ap.infraction.trim() !== ''
-        ).length;
-      
-        const enCours = data.data.filter((ap: APData) => ap.statut === 'en cours').length;
-        const traite = data.data.filter((ap: APData) => ap.statut === 'traité').length;
-        const archive = data.data.filter((ap: APData) => ap.statut === 'archivé').length;
-        const annule = data.data.filter((ap: APData) => ap.statut === 'annulé').length;
-        const enAttentePaiement = data.data.filter((ap: APData) => ap.statut === 'en attente de paiement').length;
-        const nonComparution = data.data.filter((ap: APData) => ap.statut === 'non comparution').length;
+        // Calcul des statistiques basé sur le statut
+        const enCours = formattedData.filter((ap: APData) => ap.statut === 'en cours').length;
+        const traite = formattedData.filter((ap: APData) => ap.statut === 'traité').length;
+        const archive = formattedData.filter((ap: APData) => ap.statut === 'archivé').length;
+        const annule = formattedData.filter((ap: APData) => ap.statut === 'annulé').length;
+        const enAttentePaiement = formattedData.filter((ap: APData) => ap.statut === 'en attente de paiement').length;
+        const nonComparution = formattedData.filter((ap: APData) => ap.statut === 'non comparution').length;
       
         setStats({
-          total: data.data.length,
-          avecInfraction,
-          sansInfraction: data.data.length - avecInfraction,
+          total: formattedData.length,
+          avecInfraction: formattedData.filter(ap => 
+            ap.statut && ['en cours', 'en attente de paiement', 'non comparution'].includes(ap.statut)
+          ).length,
+          sansInfraction: formattedData.filter(ap => 
+            ap.statut && ['traité', 'archivé'].includes(ap.statut)
+          ).length,
           enCours,
           traite,
           archive,
@@ -475,7 +560,7 @@ const ListeAP: React.FC = () => {
           nonComparution
         });
       
-        applyFilters(data.data, searchTerm, selectedStatut);
+        applyFilters(formattedData, searchTerm, selectedStatut);
       } else {
         throw new Error(data.message || 'Erreur lors de la récupération des données');
       }
@@ -495,13 +580,13 @@ const ListeAP: React.FC = () => {
     if (search.trim()) {
       filtered = filtered.filter(ap =>
         ap.reference_ft?.toLowerCase().includes(search.toLowerCase()) ||
-        ap.infraction?.toLowerCase().includes(search.toLowerCase()) ||
-        ap.date_ft?.toLowerCase().includes(search.toLowerCase()) ||
-        ap.id_ft_table?.toString().includes(search) ||
-        ap.status_dossier?.toLowerCase().includes(search.toLowerCase()) ||
         ap.num_ap?.toLowerCase().includes(search.toLowerCase()) ||
+        ap.date_ft?.toLowerCase().includes(search.toLowerCase()) ||
+        ap.id_ft?.toString().includes(search) ||
+        ap.status_dossier?.toLowerCase().includes(search.toLowerCase()) ||
         ap.titre_terrain?.toLowerCase().includes(search.toLowerCase()) ||
-        ap.localite?.toLowerCase().includes(search.toLowerCase())
+        ap.zone_geographique?.toLowerCase().includes(search.toLowerCase()) ||
+        ap.contact?.toLowerCase().includes(search.toLowerCase())
       );
     }
    
@@ -593,13 +678,13 @@ const ListeAP: React.FC = () => {
     try {
       let ftData: FTData;
     
-      console.log(`🔄 Tentative de récupération du FT ID: ${ap.id_ft_table}`);
+      console.log(`🔄 Tentative de récupération du FT ID: ${ap.id_ft}`);
     
       // Essayer de récupérer les données complètes du FT depuis le bon endpoint
       const endpoints = [
-        `http://localhost:3000/api/ft/${ap.id_ft_table}`,
-        `http://localhost:3000/api/ft_table/${ap.id_ft_table}`,
-        `http://localhost:3000/api/faireap/ft/${ap.id_ft_table}`
+        `http://localhost:3000/api/ft/${ap.id_ft}`,
+        `http://localhost:3000/api/ft_table/${ap.id_ft}`,
+        `http://localhost:3000/api/faireap/ft/${ap.id_ft}`
       ];
     
       let response = null;
@@ -624,7 +709,7 @@ const ListeAP: React.FC = () => {
       }
     
       if (!response || !response.ok) {
-        throw new Error(`Aucun endpoint API accessible pour récupérer le FT ID ${ap.id_ft_table}`);
+        throw new Error(`Aucun endpoint API accessible pour récupérer le FT ID ${ap.id_ft}`);
       }
     
       if (data.success) {
@@ -636,7 +721,7 @@ const ListeAP: React.FC = () => {
     } catch (error) {
       console.error('❌ Erreur lors de l\'ouverture du modal Faire AP:', error);
       const basicFtData: FTData = {
-        id: ap.id_ft_table,
+        id: ap.id_ft,
         rendezvous_id: 0,
         reference_ft: ap.reference_ft,
         date_ft: ap.date_ft,
@@ -644,11 +729,10 @@ const ListeAP: React.FC = () => {
         type_convoquee: 'Contrôle',
         nom_complet: 'Contrevenant à préciser',
         cin: '',
-        contact: '',
+        contact: ap.contact || '',
         adresse: '',
         commune: 'Commune à préciser',
         dossier_type: [],
-        infraction: ap.infraction,
         status_dossier: ap.status_dossier,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -760,7 +844,7 @@ const ListeAP: React.FC = () => {
     }, {} as Record<string, APData[]>);
 
     const sorted = Object.entries(grouped).sort((a, b) => {
-      const order = ['en cours', 'traité', 'en attente de paiement', 'non comparution', 'archivé', 'annulé'];
+      const order = ['En attente', 'en cours', 'traité', 'en attente de paiement', 'non comparution', 'archivé', 'annulé'];
       return order.indexOf(a[0]) - order.indexOf(b[0]);
     });
 
@@ -805,20 +889,20 @@ const ListeAP: React.FC = () => {
       statut: 'en cours'
     },
     {
-      categorie: 'Traité',
-      nombre: stats.traite,
-      pourcentage: stats.total > 0 ? Math.round((stats.traite / stats.total) * 100) : 0,
-      couleur: 'bg-green-500',
-      icone: <CheckCircle className="w-8 h-8 text-white" />,
-      statut: 'traité'
-    },
-    {
       categorie: 'En attente paiement',
       nombre: stats.enAttentePaiement,
       pourcentage: stats.total > 0 ? Math.round((stats.enAttentePaiement / stats.total) * 100) : 0,
       couleur: 'bg-orange-500',
       icone: <Clock className="w-8 h-8 text-white" />,
       statut: 'en attente de paiement'
+    },
+    {
+      categorie: 'Traité',
+      nombre: stats.traite,
+      pourcentage: stats.total > 0 ? Math.round((stats.traite / stats.total) * 100) : 0,
+      couleur: 'bg-green-500',
+      icone: <CheckCircle className="w-8 h-8 text-white" />,
+      statut: 'traité'
     },
     {
       categorie: 'Non comparution',
@@ -1007,7 +1091,7 @@ const ListeAP: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Rechercher par référence, numéro AP, infraction, localité, titre terrain..."
+                  placeholder="Rechercher par référence, numéro AP, zone géographique, titre terrain, contact..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1023,6 +1107,7 @@ const ListeAP: React.FC = () => {
                 className="px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="tous">Tous les statuts</option>
+                <option value="En attente">En attente</option>
                 <option value="en cours">En cours</option>
                 <option value="traité">Traité</option>
                 <option value="en attente de paiement">En attente de paiement</option>
@@ -1086,7 +1171,8 @@ const ListeAP: React.FC = () => {
                           <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Référence FT</th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Numéro AP</th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Date/Heure</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Infraction</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Zone</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Coordonnées</th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Status Dossier</th>
                           <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Actions</th>
                         </tr>
@@ -1127,14 +1213,34 @@ const ListeAP: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600">
-                              {ap.infraction ? (
-                                <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs px-2 py-1 rounded">
-                                  <AlertCircle className="w-3 h-3" />
-                                  {ap.infraction.length > 50 ? `${ap.infraction.substring(0, 50)}...` : ap.infraction}
+                              {ap.zone_geographique ? (
+                                <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
+                                  <MapPin className="w-3 h-3" />
+                                  {ap.zone_geographique}
                                 </span>
                               ) : (
                                 <span className="text-gray-400 text-xs">Non spécifiée</span>
                               )}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {/* AFFICHAGE DES COORDONNÉES DANS LE TABLEAU */}
+                              <div className="space-y-1">
+                                {ap.coord_x && (
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <span className="font-medium">X:</span>
+                                    <span>{formatCoordonnees(ap.coord_x)}</span>
+                                  </div>
+                                )}
+                                {ap.coord_y && (
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <span className="font-medium">Y:</span>
+                                    <span>{formatCoordonnees(ap.coord_y)}</span>
+                                  </div>
+                                )}
+                                {!ap.coord_x && !ap.coord_y && (
+                                  <span className="text-gray-400 text-xs">Non spécifiées</span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3 text-sm">
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">

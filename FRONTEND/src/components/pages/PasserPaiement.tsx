@@ -293,7 +293,7 @@ const PasserPaiement: React.FC<PaymentModalProps> = ({
         nouveauStatut = 'paiement en cours'; // Statut intermédiaire pour paiement en tranches
       }
 
-      const updateAPResponse = await fetch(`http://localhost:3000/api/ap/${apId}/statut`, {
+      const updateAPResponse = await fetch(`http://localhost:3000/api/${apId}/statut`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -448,403 +448,403 @@ const PasserPaiement: React.FC<PaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4 overflow-hidden">
-      <div className="bg-white rounded-xl shadow-2xl w-[90vw] max-w-4xl flex flex-col overflow-hidden max-h-[90vh]">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white flex-shrink-0">
-          <div className="flex justify-between items-center">
+  <div className="bg-white rounded-xl shadow-2xl w-[90vw] max-w-4xl flex flex-col overflow-hidden max-h-[90vh]">
+    {/* Header */}
+    <div className="p-6 border-b border-gray-200 bg-white flex-shrink-0">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-gray-100 rounded-lg">
+            <DollarSign className="w-6 h-6 text-gray-700" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900">Enregistrement du Paiement</h3>
+            <p className="text-gray-600 mt-1">
+              AP: {ap.num_ap} • Référence: {ap.reference_ft}
+            </p>
+          </div>
+        </div>
+        <button 
+          onClick={onClose}
+          disabled={isProcessing}
+          className="p-2 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
+        >
+          <X className="w-6 h-6 text-gray-600" />
+        </button>
+      </div>
+    </div>
+
+    {/* Content */}
+    <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        {/* Banner d'erreur API */}
+        {apiError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-white bg-opacity-20 rounded-lg">
-                <DollarSign className="w-6 h-6" />
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <div>
+                <h4 className="text-sm font-medium text-red-800">Erreur lors de l'enregistrement</h4>
+                <p className="text-sm text-red-700 mt-1">{apiError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Informations AP détaillées */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-gray-600" />
+            Informations de l'Avis de Paiement 
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-3">
+              <div>
+                <span className="text-gray-600 font-medium">ID AP:</span>
+                <p className="text-gray-800 font-semibold">{ap.id}</p>
               </div>
               <div>
-                <h3 className="text-2xl font-bold">Enregistrement du Paiement</h3>
-                <p className="text-blue-100 mt-1">
-                  AP: {ap.num_ap} • Référence: {ap.reference_ft}
+                <span className="text-gray-600 font-medium">Numéro AP:</span>
+                <p className="text-gray-800 font-semibold">{ap.num_ap || 'Non attribué'}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 font-medium">Date AP:</span>
+                <p className="text-gray-800">{formatDate(ap.date_ap)}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 font-medium">Montant total:</span>
+                <p className="text-gray-800 font-bold text-lg">
+                  {formatCurrency(paymentCalculations.montantTotal)}
                 </p>
               </div>
             </div>
-            <button 
-              onClick={onClose}
-              disabled={isProcessing}
-              className="p-2 rounded-full hover:bg-white hover:bg-opacity-20 transition-colors disabled:opacity-50"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="space-y-3">
+              <div>
+                <span className="text-gray-600 font-medium">Référence FT:</span>
+                <p className="text-gray-800">{ap.reference_ft}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 font-medium">Date limite de paiement:</span>
+                <p className="text-gray-800 flex items-center gap-1">
+                  <Clock className="w-4 h-4 text-gray-500" />
+                  {ap.date_delai_payment ? formatDate(ap.date_delai_payment) : 'Non spécifiée'}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-600 font-medium">Contact:</span>
+                <p className="text-gray-800">{ap.contact || 'Non spécifié'}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 font-medium">Montant en lettres:</span>
+                <p className="text-gray-800 italic">{ap.montant_lettre || 'Non spécifié'}</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Informations supplémentaires */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600 font-medium">Infraction:</span>
+                <p className="text-gray-800">{ap.infraction || 'Non spécifiée'}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 font-medium">Localité:</span>
+                <p className="text-gray-800 flex items-center gap-1">
+                  <MapPin className="w-4 h-4 text-gray-500" />
+                  {ap.localite || 'Non spécifiée'}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-600 font-medium">Superficie:</span>
+                <p className="text-gray-800">
+                  {ap.superficie ? new Intl.NumberFormat('fr-FR').format(ap.superficie) + ' m²' : 'Non spécifiée'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Banner d'erreur API */}
-            {apiError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                  <div>
-                    <h4 className="text-sm font-medium text-red-800">Erreur lors de l'enregistrement</h4>
-                    <p className="text-sm text-red-700 mt-1">{apiError}</p>
-                  </div>
+        {/* Section Type de Paiement */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Divide className="w-4 h-4 text-gray-600" />
+            Type de Paiement
+          </h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <button
+              type="button"
+              onClick={() => handlePaymentTypeChange('complet')}
+              disabled={isProcessing}
+              className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all text-left ${
+                paymentType === 'complet'
+                  ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className="flex items-center space-x-3 w-full">
+                <div className={`p-2 rounded-full ${
+                  paymentType === 'complet' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Paiement complet</p>
+                  <p className="text-sm text-gray-600">Règlement du montant total en une fois</p>
                 </div>
               </div>
-            )}
+            </button>
 
-            {/* Informations AP détaillées */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Informations de l'Avis de Paiement 
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="space-y-3">
-                  <div>
-                    <span className="text-blue-600 font-medium">ID AP:</span>
-                    <p className="text-blue-800 font-semibold">{ap.id}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 font-medium">Numéro AP:</span>
-                    <p className="text-blue-800 font-semibold">{ap.num_ap || 'Non attribué'}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 font-medium">Date AP:</span>
-                    <p className="text-blue-800">{formatDate(ap.date_ap)}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 font-medium">Montant total:</span>
-                    <p className="text-blue-800 font-bold text-lg">
-                      {formatCurrency(paymentCalculations.montantTotal)}
-                    </p>
-                  </div>
+            <button
+              type="button"
+              onClick={() => handlePaymentTypeChange('tranche')}
+              disabled={isProcessing}
+              className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all text-left ${
+                paymentType === 'tranche'
+                  ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className="flex items-center space-x-3 w-full">
+                <div className={`p-2 rounded-full ${
+                  paymentType === 'tranche' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  <Divide className="w-5 h-5" />
                 </div>
-                <div className="space-y-3">
-                  <div>
-                    <span className="text-blue-600 font-medium">Référence FT:</span>
-                    <p className="text-blue-800">{ap.reference_ft}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 font-medium">Date limite de paiement:</span>
-                    <p className="text-blue-800 flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      {ap.date_delai_payment ? formatDate(ap.date_delai_payment) : 'Non spécifiée'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 font-medium">Contact:</span>
-                    <p className="text-blue-800">{ap.contact || 'Non spécifié'}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 font-medium">Montant en lettres:</span>
-                    <p className="text-blue-800 italic">{ap.montant_lettre || 'Non spécifié'}</p>
-                  </div>
+                <div>
+                  <p className="font-medium text-gray-900">Paiement en tranches</p>
+                  <p className="text-sm text-gray-600">Échelonnement sur plusieurs mois</p>
                 </div>
               </div>
-              
-              {/* Informations supplémentaires */}
-              <div className="mt-4 pt-4 border-t border-blue-200">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-blue-600 font-medium">Infraction:</span>
-                    <p className="text-blue-800">{ap.infraction || 'Non spécifiée'}</p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 font-medium">Localité:</span>
-                    <p className="text-blue-800 flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {ap.localite || 'Non spécifiée'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-blue-600 font-medium">Superficie:</span>
-                    <p className="text-blue-800">
-                      {ap.superficie ? new Intl.NumberFormat('fr-FR').format(ap.superficie) + ' m²' : 'Non spécifiée'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </button>
+          </div>
 
-            {/* Section Type de Paiement */}
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <h4 className="font-semibold text-purple-900 mb-4 flex items-center gap-2">
-                <Divide className="w-4 h-4" />
-                Type de Paiement
-              </h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <button
-                  type="button"
-                  onClick={() => handlePaymentTypeChange('complet')}
-                  disabled={isProcessing}
-                  className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all text-left ${
-                    paymentType === 'complet'
-                      ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <div className="flex items-center space-x-3 w-full">
-                    <div className={`p-2 rounded-full ${
-                      paymentType === 'complet' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      <DollarSign className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Paiement complet</p>
-                      <p className="text-sm text-gray-600">Règlement du montant total en une fois</p>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePaymentTypeChange('tranche')}
-                  disabled={isProcessing}
-                  className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all text-left ${
-                    paymentType === 'tranche'
-                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <div className="flex items-center space-x-3 w-full">
-                    <div className={`p-2 rounded-full ${
-                      paymentType === 'tranche' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      <Divide className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Paiement en tranches</p>
-                      <p className="text-sm text-gray-600">Échelonnement sur plusieurs mois</p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-
-              {/* Configuration des tranches */}
-              {paymentType === 'tranche' && (
-                <div className="bg-white p-4 rounded-lg border border-purple-100">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-purple-700 mb-2">
-                        Nombre de tranches *
-                      </label>
-                      <select
-                        name="nombre_tranches"
-                        value={nombreTranches}
-                        onChange={handleInputChange}
-                        disabled={isProcessing}
-                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                          errors.nombre_tranches ? 'border-red-300' : 'border-purple-200'
-                        } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {Array.from({ length: paymentCalculations.maxTranches }, (_, i) => i + 1).map(num => (
-                          <option key={num} value={num}>
-                            {num} tranche{num > 1 ? 's' : ''}
-                          </option>
-                        ))}
-                      </select>
-                      {errors.nombre_tranches && (
-                        <p className="text-red-600 text-sm mt-1">{errors.nombre_tranches}</p>
-                      )}
-                      <p className="text-xs text-purple-600 mt-1">
-                        Maximum: {paymentCalculations.maxTranches} tranches (mois restants: {paymentCalculations.moisRestants})
-                      </p>
-                    </div>
-
-                    <div className="bg-purple-50 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-purple-800">Récapitulatif</p>
-                      <div className="mt-2 space-y-1 text-xs text-purple-700">
-                        <p>• Montant par tranche: <strong>{formatCurrency(paymentCalculations.montantParTranche)}</strong></p>
-                        <p>• Échéance: avant fin {paymentCalculations.currentYear}</p>
-                        <p>• Tranches restantes: {nombreTranches - 1}</p>
-                        <p>• Montant total: {formatCurrency(paymentCalculations.montantTotal)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Section Détails du Paiement */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h4 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
-                Détails du Paiement
-              </h4>
-
-              {/* Date de paiement */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-green-700 mb-2 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-green-600" />
-                  Date du paiement *
-                </label>
-                <input
-                  type="date"
-                  name="date_payment"
-                  value={formData.date_payment}
-                  onChange={handleInputChange}
-                  disabled={isProcessing}
-                  max={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                    errors.date_payment ? 'border-red-300' : 'border-green-200'
-                  } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  required
-                />
-                {errors.date_payment && (
-                  <p className="text-red-600 text-sm mt-1">{errors.date_payment}</p>
-                )}
-              </div>
-
-              {/* Méthode de paiement */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-green-700 mb-3">
-                  Méthode de paiement *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {paymentMethods.map((method) => (
-                    <PaymentMethodButton
-                      key={method.value}
-                      method={method}
-                      isSelected={formData.method_payment === method.value}
-                      onChange={handleMethodPaymentChange}
-                      disabled={isProcessing}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Référence (conditionnelle) */}
-              {(formData.method_payment === 'cheque' || formData.method_payment === 'virement') && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-green-700 mb-2">
-                    {formData.method_payment === 'cheque' ? 'Numéro de chèque *' : 'Référence de virement *'}
+          {/* Configuration des tranches */}
+          {paymentType === 'tranche' && (
+            <div className="bg-white p-4 rounded-lg border border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre de tranches *
                   </label>
-                  <input
-                    type="text"
-                    name="reference_payment"
-                    value={formData.reference_payment}
+                  <select
+                    name="nombre_tranches"
+                    value={nombreTranches}
                     onChange={handleInputChange}
                     disabled={isProcessing}
-                    placeholder={
-                      formData.method_payment === 'cheque' 
-                        ? 'Entrez le numéro du chèque' 
-                        : 'Entrez la référence du virement'
-                    }
-                    maxLength={255}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      errors.reference_payment ? 'border-red-300' : 'border-green-200'
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.nombre_tranches ? 'border-red-300' : 'border-gray-300'
                     } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  />
-                  {errors.reference_payment && (
-                    <p className="text-red-600 text-sm mt-1">{errors.reference_payment}</p>
+                  >
+                    {Array.from({ length: paymentCalculations.maxTranches }, (_, i) => i + 1).map(num => (
+                      <option key={num} value={num}>
+                        {num} tranche{num > 1 ? 's' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.nombre_tranches && (
+                    <p className="text-red-600 text-sm mt-1">{errors.nombre_tranches}</p>
                   )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Maximum: {paymentCalculations.maxTranches} tranches (mois restants: {paymentCalculations.moisRestants})
+                  </p>
                 </div>
-              )}
 
-              {/* Montant */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-green-700 mb-2">
-                  Montant à payer {paymentType === 'tranche' ? '(cette tranche)' : ''} *
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    name="montant"
-                    value={formData.montant}
-                    onChange={handleInputChange}
-                    disabled={isProcessing || paymentType === 'tranche'}
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                    max={paymentCalculations.montantTotal}
-                    className={`w-full px-3 py-2 pl-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
-                      errors.montant ? 'border-red-300' : 'border-green-200'
-                    } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    required
-                  />
-                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-600">
-                    <DollarSign className="w-5 h-5" />
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm font-medium text-gray-800">Récapitulatif</p>
+                  <div className="mt-2 space-y-1 text-xs text-gray-700">
+                    <p>• Montant par tranche: <strong>{formatCurrency(paymentCalculations.montantParTranche)}</strong></p>
+                    <p>• Échéance: avant fin {paymentCalculations.currentYear}</p>
+                    <p>• Tranches restantes: {nombreTranches - 1}</p>
+                    <p>• Montant total: {formatCurrency(paymentCalculations.montantTotal)}</p>
                   </div>
                 </div>
-                {errors.montant && (
-                  <p className="text-red-600 text-sm mt-1">{errors.montant}</p>
-                )}
-                {formData.montant > 0 && !errors.montant && (
-                  <div className="space-y-1 mt-2">
-                    <p className="text-green-700 text-sm font-medium">
-                      Montant saisi: {formatCurrency(formData.montant)}
-                    </p>
-                    {paymentType === 'tranche' && (
-                      <p className="text-blue-600 text-sm">
-                        Montant restant: {formatCurrency(paymentCalculations.montantRestant)}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {paymentType === 'complet' && (
-                  <p className="text-blue-600 text-sm mt-1">
-                    Montant total AP: {formatCurrency(paymentCalculations.montantTotal)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Section Détails du Paiement */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-gray-600" />
+            Détails du Paiement
+          </h4>
+
+          {/* Date de paiement */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-gray-600" />
+              Date du paiement *
+            </label>
+            <input
+              type="date"
+              name="date_payment"
+              value={formData.date_payment}
+              onChange={handleInputChange}
+              disabled={isProcessing}
+              max={new Date().toISOString().split('T')[0]}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.date_payment ? 'border-red-300' : 'border-gray-300'
+              } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+              required
+            />
+            {errors.date_payment && (
+              <p className="text-red-600 text-sm mt-1">{errors.date_payment}</p>
+            )}
+          </div>
+
+          {/* Méthode de paiement */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Méthode de paiement *
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {paymentMethods.map((method) => (
+                <PaymentMethodButton
+                  key={method.value}
+                  method={method}
+                  isSelected={formData.method_payment === method.value}
+                  onChange={handleMethodPaymentChange}
+                  disabled={isProcessing}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Référence (conditionnelle) */}
+          {(formData.method_payment === 'cheque' || formData.method_payment === 'virement') && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {formData.method_payment === 'cheque' ? 'Numéro de chèque *' : 'Référence de virement *'}
+              </label>
+              <input
+                type="text"
+                name="reference_payment"
+                value={formData.reference_payment}
+                onChange={handleInputChange}
+                disabled={isProcessing}
+                placeholder={
+                  formData.method_payment === 'cheque' 
+                    ? 'Entrez le numéro du chèque' 
+                    : 'Entrez la référence du virement'
+                }
+                maxLength={255}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.reference_payment ? 'border-red-300' : 'border-gray-300'
+                } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+              />
+              {errors.reference_payment && (
+                <p className="text-red-600 text-sm mt-1">{errors.reference_payment}</p>
+              )}
+            </div>
+          )}
+
+          {/* Montant */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Montant à payer {paymentType === 'tranche' ? '(cette tranche)' : ''} *
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="montant"
+                value={formData.montant}
+                onChange={handleInputChange}
+                disabled={isProcessing || paymentType === 'tranche'}
+                placeholder="0.00"
+                step="0.01"
+                min="0"
+                max={paymentCalculations.montantTotal}
+                className={`w-full px-3 py-2 pl-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.montant ? 'border-red-300' : 'border-gray-300'
+                } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                required
+              />
+              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600">
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </div>
+            {errors.montant && (
+              <p className="text-red-600 text-sm mt-1">{errors.montant}</p>
+            )}
+            {formData.montant > 0 && !errors.montant && (
+              <div className="space-y-1 mt-2">
+                <p className="text-gray-700 text-sm font-medium">
+                  Montant saisi: {formatCurrency(formData.montant)}
+                </p>
+                {paymentType === 'tranche' && (
+                  <p className="text-blue-600 text-sm">
+                    Montant restant: {formatCurrency(paymentCalculations.montantRestant)}
                   </p>
                 )}
               </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-green-700 mb-2">
-                  Notes (optionnel)
-                </label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleInputChange}
-                  disabled={isProcessing}
-                  placeholder="Ajoutez des notes supplémentaires sur ce paiement..."
-                  rows={3}
-                  maxLength={1000}
-                  className={`w-full px-3 py-2 border border-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none ${
-                    isProcessing ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {formData.notes?.length || 0}/1000 caractères
-                </p>
-              </div>
-            </div>
-          </form>
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-between items-center flex-shrink-0">
-          <button 
-            type="button"
-            onClick={onClose}
-            disabled={isProcessing}
-            className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Annuler
-          </button>
-          
-          <button 
-            type="submit"
-            onClick={handleSubmit}
-            disabled={isProcessing}
-            className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isProcessing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Enregistrement...</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-4 h-4" />
-                <span>
-                  {paymentType === 'complet' ? 'Confirmer le paiement complet' : `Confirmer la tranche 1/${nombreTranches}`}
-                </span>
-              </>
             )}
-          </button>
+            {paymentType === 'complet' && (
+              <p className="text-blue-600 text-sm mt-1">
+                Montant total AP: {formatCurrency(paymentCalculations.montantTotal)}
+              </p>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Notes (optionnel)
+            </label>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleInputChange}
+              disabled={isProcessing}
+              placeholder="Ajoutez des notes supplémentaires sur ce paiement..."
+              rows={3}
+              maxLength={1000}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${
+                isProcessing ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {formData.notes?.length || 0}/1000 caractères
+            </p>
+          </div>
         </div>
-      </div>
+      </form>
     </div>
+
+    {/* Footer */}
+    <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-between items-center flex-shrink-0">
+      <button 
+        type="button"
+        onClick={onClose}
+        disabled={isProcessing}
+        className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Annuler
+      </button>
+      
+      <button 
+        type="submit"
+        onClick={handleSubmit}
+        disabled={isProcessing}
+        className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isProcessing ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span>Enregistrement...</span>
+          </>
+        ) : (
+          <>
+            <CheckCircle className="w-4 h-4" />
+            <span>
+              {paymentType === 'complet' ? 'Confirmer le paiement complet' : `Confirmer la tranche 1/${nombreTranches}`}
+            </span>
+          </>
+        )}
+      </button>
+    </div>
+  </div>
+</div>
   );
 };
 

@@ -1059,13 +1059,13 @@ const FaireAPComponent: React.FC<{
       console.log('📦 Données envoyées au backend pour UPDATE:', paymentData);
 
       // ✅ UTILISER PUT AU LIEU DE POST
-      const response = await fetch(`http://localhost:3000/api/ap/ft/${ft.id}/ap`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(paymentData),
-      });
+const response = await fetch(`http://localhost:3000/api/ft/${ft.id}/ap`, {
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify(paymentData),
+});
 
       if (!response.ok) {
         let errorMessage = `Erreur HTTP: ${response.status}`;

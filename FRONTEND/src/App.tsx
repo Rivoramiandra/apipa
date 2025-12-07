@@ -1,44 +1,38 @@
-import React, { useState, useEffect } from "react";
-import LoginPage from "./components/auth/LoginPage";
-import AdminLayout from "./components/layout/AdminLayout";
+import React, { useState } from 'react';
+import LoginPage from './components/auth/LoginPage';
+import AdminLayout from './components/layout/AdminLayout';
+
+interface UserData {
+  role: 'admin' | 'agent';
+  name: string;
+  email: string;
+}
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
 
-  useEffect(() => {
-    // On supprime le token à chaque lancement
-    localStorage.removeItem("adminToken");
-    setLoading(false);
-  }, []);
-
-  const handleLogin = (success: boolean) => {
-    if (success) {
-      // Stockage optionnel (utile si tu veux voir le token côté dev)
-      localStorage.setItem("adminToken", "authenticated");
-      setIsAuthenticated(true);
-    }
+  const handleLogin = (userData: UserData) => {
+    setUserData(userData);
+    setIsLoggedIn(true);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("adminToken");
-    setIsAuthenticated(false);
+    setUserData(null);
+    setIsLoggedIn(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <p className="text-gray-500 text-lg animate-pulse">
-          Chargement de l'application...
-        </p>
-      </div>
-    );
+  if (!isLoggedIn || !userData) {
+    return <LoginPage onLogin={handleLogin} />;
   }
 
-  return isAuthenticated ? (
-    <AdminLayout onLogout={handleLogout} />
-  ) : (
-    <LoginPage onLogin={handleLogin} />
+  return (
+    <AdminLayout
+      onLogout={handleLogout}
+      userRole={userData.role}
+      userName={userData.name}
+      userEmail={userData.email}
+    />
   );
 }
 

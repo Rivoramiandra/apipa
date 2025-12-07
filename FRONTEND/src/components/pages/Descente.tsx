@@ -3,7 +3,8 @@ import axios from 'axios';
 import { 
   Plus, Search, User, MapPin, Home, Tag,  
   AlertTriangle, Globe, Eye, Clock, CheckCircle, AlertCircle, 
-  X, ChevronLeft, ChevronRight, Calendar, FileText, Phone
+  X, ChevronLeft, ChevronRight, Calendar, FileText, Phone,
+  Edit, Trash2
 } from 'lucide-react';
 
 // Composant Toast
@@ -58,6 +59,7 @@ const Info = ({ className }: { className?: string }) => (
 );
 
 interface Descente {
+  n: number;
   date_desce: Date;
   actions: string;
   n_pv_pat: string;
@@ -100,6 +102,12 @@ interface Descente {
   dossier_a_fournir: string[];
 }
 
+interface FokontanyData {
+  fokontany: string;
+  commune: string;
+  district: string;
+}
+
 const initialFormData = {
   dateDescente: "",
   heureDescente: "",
@@ -115,30 +123,25 @@ const initialFormData = {
   adresseR: "",
   commune: "",
   fokontany: "",
+  district: "",
   localite: "",
   X_coord: 0,
   Y_coord: 0,
-  infraction: "",
+  check: [] as string[],
   actions: [] as string[],
   dossierAFournir: [] as string[],
   modelePV: "PAT",
 };
 
-const fetchInfractionStats = async () => {
-  try {
-    const response = await axios.get("http://localhost:3000/api/infractions/categories");
-    return response.data.data;
-  } catch (error) {
-    console.error("Erreur lors de la récupération des statistiques d'infractions:", error);
-    return [];
-  }
-};
+// Configuration de base pour axios
+const API_BASE_URL = "http://localhost:3000/api/nouvelle-descente";
 
+// Fonctions API adaptées aux nouvelles routes
 const saveDescente = async (descenteData: any) => {
   try {
     console.log("📤 Envoi des données au serveur:", descenteData);
     
-    const response = await axios.post("http://localhost:3000/api/nouvelle-descente/descentes", descenteData, {
+    const response = await axios.post(`${API_BASE_URL}/descentes`, descenteData, {
       headers: {
         'Content-Type': 'application/json',
       }
@@ -160,11 +163,80 @@ const saveDescente = async (descenteData: any) => {
   }
 };
 
+const updateDescente = async (id: number, descenteData: any) => {
+  try {
+    console.log("📤 Mise à jour des données pour ID:", id, descenteData);
+    
+    const response = await axios.put(`${API_BASE_URL}/descentes/${id}`, descenteData, {
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    console.log("✅ Réponse du serveur:", response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ Erreur lors de la mise à jour:", error);
+    
+    if (error.response) {
+      console.error("Détails de l'erreur:", error.response.data);
+      throw new Error(error.response.data.message || "Erreur lors de la mise à jour");
+    } else if (error.request) {
+      throw new Error("Impossible de contacter le serveur");
+    } else {
+      throw new Error("Erreur de configuration de la requête");
+    }
+  }
+};
+
+const deleteDescente = async (id: number) => {
+  try {
+    console.log("🗑️ Suppression de la descente ID:", id);
+    
+    const response = await axios.delete(`${API_BASE_URL}/descentes/${id}`);
+    
+    console.log("✅ Réponse du serveur:", response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ Erreur lors de la suppression:", error);
+    
+    if (error.response) {
+      console.error("Détails de l'erreur:", error.response.data);
+      throw new Error(error.response.data.message || "Erreur lors de la suppression");
+    } else if (error.request) {
+      throw new Error("Impossible de contacter le serveur");
+    } else {
+      throw new Error("Erreur de configuration de la requête");
+    }
+  }
+};
+
+const fetchDescentes = async () => {
+  try {
+    console.log("🔄 Chargement des descentes depuis:", `${API_BASE_URL}/descentes`);
+    const response = await axios.get(`${API_BASE_URL}/descentes`);
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ Erreur lors du chargement des descentes:", error);
+    throw error;
+  }
+};
+
+// Fonction pour rechercher les données de fokontany
+const searchFokontany = async (searchTerm: string): Promise<FokontanyData[]> => {
+  try {
+    console.log("🔍 Recherche fokontany:", searchTerm);
+    const response = await axios.get(`${API_BASE_URL}/recherche/fokontany?search=${encodeURIComponent(searchTerm)}`);
+    return response.data.data || [];
+  } catch (error: any) {
+    console.error("❌ Erreur lors de la recherche fokontany:", error);
+    return [];
+  }
+};
+
 const FieldActionsComponent: React.FC = () => {
   const [formData, setFormData] = useState(initialFormData);
   const [listeDescentes, setListeDescentes] = useState<Descente[]>([]);
-  const [infractionStats, setInfractionStats] = useState([]);
-  const [loadingStats, setLoadingStats] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
@@ -176,9 +248,21 @@ const FieldActionsComponent: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: 'success' | 'error' | 'warning' | 'info' }>>([]);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [editingMode, setEditingMode] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{show: boolean, descente: Descente | null}>({show: false, descente: null});
+  const [fokontanySuggestions, setFokontanySuggestions] = useState<FokontanyData[]>([]);
+  const [showFokontanySuggestions, setShowFokontanySuggestions] = useState(false);
+  const [isSearchingFokontany, setIsSearchingFokontany] = useState(false);
+  
   const itemsPerPage = 10;
 
   const dossierOptions = ['CSJ', 'Plan off', "PU (Permis d'Utilisation)", 'Permis de Construction', 'Permis de Remblais'];
+  
+  const checkOptions = [
+    'remblai illicite',
+    'construction sur remblai illicite',
+    'cellage'
+  ];
 
   // Fonction pour ajouter un toast
   const addToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -191,12 +275,45 @@ const FieldActionsComponent: React.FC = () => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
 
+  // Fonction pour rechercher automatiquement le fokontany
+  const handleFokontanySearch = async (fokontanyValue: string) => {
+    if (fokontanyValue.length < 2) {
+      setFokontanySuggestions([]);
+      setShowFokontanySuggestions(false);
+      return;
+    }
+
+    setIsSearchingFokontany(true);
+    try {
+      const results = await searchFokontany(fokontanyValue);
+      setFokontanySuggestions(results);
+      setShowFokontanySuggestions(results.length > 0);
+    } catch (error) {
+      console.error("Erreur lors de la recherche:", error);
+      setFokontanySuggestions([]);
+      setShowFokontanySuggestions(false);
+    } finally {
+      setIsSearchingFokontany(false);
+    }
+  };
+
+  // Fonction pour sélectionner un fokontany et remplir automatiquement commune et district
+  const handleFokontanySelect = (fokontanyData: FokontanyData) => {
+    setFormData(prev => ({
+      ...prev,
+      fokontany: fokontanyData.fokontany,
+      commune: fokontanyData.commune,
+      district: fokontanyData.district
+    }));
+    setShowFokontanySuggestions(false);
+    setFokontanySuggestions([]);
+  };
+
   // Fonction pour ouvrir le modal de confirmation
   const openConfirmationModal = () => {
-    // Validation des champs obligatoires
     if (!formData.dateDescente || !formData.heureDescente || !formData.numeroPV || 
         !formData.typeVerbalisateur || !formData.nomVerbalisateur || !formData.commune || 
-        !formData.fokontany || !formData.localite || !formData.infraction) {
+        !formData.fokontany || !formData.localite || formData.check.length === 0) {
       addToast("Veuillez remplir tous les champs obligatoires", 'warning');
       return;
     }
@@ -209,118 +326,224 @@ const FieldActionsComponent: React.FC = () => {
     await handleSubmit();
   };
 
-  useEffect(() => {
-    const fetchDescentes = async () => {
-      try {
-        console.log("🔄 Chargement des données de descente...");
-        const response = await axios.get("http://localhost:3000/api/descentes");
-        
-        console.log("✅ Réponse API reçue:", response.data);
+  // Fonction pour ouvrir le formulaire de modification
+  const handleEditClick = (descente: Descente) => {
+    const infractionArray = parseInfractionToArray(descente.infraction);
+    
+    setFormData({
+      dateDescente: descente.date_desce ? new Date(descente.date_desce).toISOString().split('T')[0] : "",
+      heureDescente: descente.heure_descente || "",
+      dateRendezVous: descente.date_rendez_vous ? new Date(descente.date_rendez_vous).toISOString().split('T')[0] : "",
+      heureRendezVous: descente.heure_rendez_vous || "",
+      numeroPV: descente.n_pv_pat || descente.n_fifafi || "",
+      reference: descente.reference || "",
+      typeVerbalisateur: descente.type_verbalisateur || "",
+      nomVerbalisateur: descente.nom_verbalisateur || "",
+      personneR: descente.personne_r || "",
+      nomPersonneR: descente.nom_personne_r || descente.proprietai || "",
+      contactR: descente.contact_r || "",
+      adresseR: descente.adresse_r || "",
+      commune: descente.commune || "",
+      fokontany: descente.fokontany || "",
+      district: "", // À récupérer si disponible dans les données
+      localite: descente.localisati || "",
+      X_coord: descente.x_coord || 0,
+      Y_coord: descente.y_coord || 0,
+      check: infractionArray,
+      actions: descente.actions ? descente.actions.split(',').map(a => a.trim()) : [],
+      dossierAFournir: Array.isArray(descente.dossier_a_fournir) ? descente.dossier_a_fournir : [],
+      modelePV: descente.modele_pv || (descente.n_pv_pat ? "PAT" : "FIFAFI"),
+    });
+    
+    setSelectedDescente(descente);
+    setShowForm(true);
+    setEditingMode(true);
+  };
 
-        let data = response.data;
+  // Fonction pour supprimer une descente
+  const handleDeleteClick = (descente: Descente) => {
+    setDeleteConfirmation({show: true, descente});
+  };
 
-        if (!Array.isArray(data)) {
-          console.warn("⚠️ La réponse n'est pas un tableau, tentative de conversion...");
-          if (data && typeof data === 'object') {
-            const arrayKey = Object.keys(data).find(key => Array.isArray(data[key]));
-            data = arrayKey ? data[arrayKey] : [data];
-          } else {
-            data = [];
-          }
-        }
+  // Fonction pour confirmer la suppression
+  const confirmDelete = async () => {
+    if (!deleteConfirmation.descente) return;
 
-        if (Array.isArray(data)) {
-          const parsedData = data.map(d => {
-            // Gestion spéciale pour dossier_a_fournir qui peut être un string ou array
-            let dossierArray: string[] = [];
-            if (Array.isArray(d.dossier_a_fournir)) {
-              dossierArray = d.dossier_a_fournir;
-            } else if (typeof d.dossier_a_fournir === 'string' && d.dossier_a_fournir.trim() !== '') {
-              try {
-                // Essayer de parser comme JSON
-                dossierArray = JSON.parse(d.dossier_a_fournir);
-              } catch {
-                // Si ce n'est pas du JSON, traiter comme une chaîne simple
-                dossierArray = [d.dossier_a_fournir];
-              }
-            }
+    try {
+      setIsLoading(true);
+      await deleteDescente(deleteConfirmation.descente.n);
+      
+      setListeDescentes(prev => prev.filter(d => d.n !== deleteConfirmation.descente!.n));
+      
+      addToast("Descente supprimée avec succès", 'success');
+    } catch (error: any) {
+      console.error("❌ Erreur lors de la suppression:", error);
+      addToast(`Erreur lors de la suppression: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+      setDeleteConfirmation({show: false, descente: null});
+    }
+  };
 
-            return {
-              ...d,
-              x_coord: Number(d.x_coord) || 0,
-              y_coord: Number(d.y_coord) || 0,
-              x_long: Number(d.x_long) || 0,
-              y_lat: Number(d.y_lat) || 0,
-              superficie: Number(d.superficie) || 0,
-              montant: Number(d.montant) || 0,
-              amende_reg: Number(d.amende_reg) || 0,
-              Montant_1: Number(d.Montant_1) || 0,
-              Montant_2: Number(d.Montant_2) || 0,
-              heure_descente: d.heure_descente || '',
-              date_rendez_vous: d.date_rendez_vous || '',
-              heure_rendez_vous: d.heure_rendez_vous || '',
-              type_verbalisateur: d.type_verbalisateur || '',
-              nom_verbalisateur: d.nom_verbalisateur || '',
-              nom_personne_r: d.nom_personne_r || d.proprietai || '',
-              fokontany: d.fokontany || '',
-              modele_pv: d.modele_pv || '',
-              contact_r: d.contact_r || '',
-              adresse_r: d.adresse_r || '',
-              dossier_a_fournir: dossierArray,
-              // Assurer que les champs texte ne soient pas null
-              commune: d.commune || '',
-              localisati: d.localisati || '',
-              infraction: d.infraction || '',
-              reference: d.reference || '',
-              personne_r: d.personne_r || '',
-              actions: d.actions || ''
-            };
-          }).sort((a, b) => new Date(b.date_desce).getTime() - new Date(a.date_desce).getTime());
-          
-          setListeDescentes(parsedData);
-          console.log(`✅ ${parsedData.length} descentes chargées avec succès`);
-          console.log("📊 Exemple de données parsées:", parsedData[0]);
+  // Fonction pour mettre à jour une descente
+  const handleUpdate = async (e?: React.FormEvent<HTMLFormElement>) => {
+    if (e) {
+      e.preventDefault();
+    }
+    
+    if (!selectedDescente) return;
+    
+    setIsSubmitting(true);
+
+    try {
+      const infractionString = formData.check.join(', ');
+
+      const descenteData = {
+        dateDescente: formData.dateDescente,
+        heureDescente: formData.heureDescente,
+        numeroPV: formData.numeroPV,
+        reference: formData.reference,
+        typeVerbalisateur: formData.typeVerbalisateur,
+        nomVerbalisateur: formData.nomVerbalisateur,
+        personneR: formData.personneR,
+        nomPersonneR: formData.nomPersonneR,
+        contactR: formData.contactR,
+        adresseR: formData.adresseR,
+        commune: formData.commune,
+        fokontany: formData.fokontany,
+        localite: formData.localite,
+        infraction: infractionString,
+        dossierAFournir: formData.dossierAFournir,
+        dateRendezVous: formData.dateRendezVous || "",
+        heureRendezVous: formData.heureRendezVous || "",
+        X_coord: formData.X_coord,
+        Y_coord: formData.Y_coord,
+        actions: formData.actions,
+        modelePV: formData.modelePV,
+      };
+
+      console.log("💾 Mise à jour des données:", descenteData);
+
+      const result = await updateDescente(selectedDescente.n, descenteData);
+      
+      console.log("✅ Descente mise à jour avec succès:", result);
+      
+      // Recharger les données depuis le serveur
+      await loadDescentes();
+      
+      addToast("Descente mise à jour avec succès !", 'success');
+      
+      resetForm();
+      setShowForm(false);
+      
+    } catch (error: any) {
+      console.error("❌ Erreur lors de la mise à jour:", error);
+      addToast(`Erreur lors de la mise à jour: ${error.message}`, 'error');
+    } finally {
+      setIsSubmitting(false);
+      setEditingMode(false);
+      setSelectedDescente(null);
+    }
+  };
+
+  // Fonction pour charger les descentes
+  const loadDescentes = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log("🔄 Chargement des données de descente...");
+      const response = await fetchDescentes();
+      
+      console.log("✅ Réponse API reçue:", response);
+
+      let data = response.data || response;
+
+      if (!Array.isArray(data)) {
+        console.warn("⚠️ La réponse n'est pas un tableau, tentative de conversion...");
+        if (data && typeof data === 'object') {
+          const arrayKey = Object.keys(data).find(key => Array.isArray(data[key]));
+          data = arrayKey ? data[arrayKey] : [data];
         } else {
-          throw new Error("Format de données invalide");
+          data = [];
         }
-
-      } catch (err: any) {
-        console.error("❌ Erreur de chargement:", err);
-        let errorMessage = "Erreur lors du chargement des données";
-
-        if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
-          errorMessage = "Impossible de se connecter au serveur. Vérifiez que le serveur est démarré sur le port 3000.";
-        } else if (err.response?.status === 404) {
-          errorMessage = "Endpoint non trouvé. Vérifiez la route /api/descentes.";
-        } else if (err.response?.data?.error) {
-          errorMessage = err.response.data.error;
-        }
-
-        setError(errorMessage);
-        setListeDescentes([]);
-        addToast(errorMessage, 'error');
-      } finally {
-        setIsLoading(false);
       }
-    };
 
-    fetchDescentes();
-  }, []);
+      if (Array.isArray(data)) {
+        const parsedData = data.map(d => {
+          let dossierArray: string[] = [];
+          if (Array.isArray(d.dossier_a_fournir)) {
+            dossierArray = d.dossier_a_fournir;
+          } else if (typeof d.dossier_a_fournir === 'string' && d.dossier_a_fournir.trim() !== '') {
+            try {
+              dossierArray = JSON.parse(d.dossier_a_fournir);
+            } catch {
+              dossierArray = [d.dossier_a_fournir];
+            }
+          }
+
+          return {
+            ...d,
+            n: Number(d.n) || 0,
+            x_coord: Number(d.x_coord) || 0,
+            y_coord: Number(d.y_coord) || 0,
+            x_long: Number(d.x_long) || 0,
+            y_lat: Number(d.y_lat) || 0,
+            superficie: Number(d.superficie) || 0,
+            montant: Number(d.montant) || 0,
+            amende_reg: Number(d.amende_reg) || 0,
+            Montant_1: Number(d.Montant_1) || 0,
+            Montant_2: Number(d.Montant_2) || 0,
+            heure_descente: d.heure_descente || '',
+            date_rendez_vous: d.date_rendez_vous || '',
+            heure_rendez_vous: d.heure_rendez_vous || '',
+            type_verbalisateur: d.type_verbalisateur || '',
+            nom_verbalisateur: d.nom_verbalisateur || '',
+            nom_personne_r: d.nom_personne_r || d.proprietai || '',
+            fokontany: d.fokontany || '',
+            modele_pv: d.modele_pv || '',
+            contact_r: d.contact_r || '',
+            adresse_r: d.adresse_r || '',
+            dossier_a_fournir: dossierArray,
+            commune: d.commune || '',
+            localisati: d.localisati || '',
+            infraction: d.infraction || '',
+            reference: d.reference || '',
+            personne_r: d.personne_r || '',
+            actions: d.actions || ''
+          };
+        }).sort((a, b) => new Date(b.date_desce).getTime() - new Date(a.date_desce).getTime());
+        
+        setListeDescentes(parsedData);
+        console.log(`✅ ${parsedData.length} descentes chargées avec succès`);
+      } else {
+        throw new Error("Format de données invalide");
+      }
+
+    } catch (err: any) {
+      console.error("❌ Erreur de chargement:", err);
+      let errorMessage = "Erreur lors du chargement des données";
+
+      if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
+        errorMessage = "Impossible de se connecter au serveur. Vérifiez que le serveur est démarré sur le port 3000.";
+      } else if (err.response?.status === 404) {
+        errorMessage = "Endpoint non trouvé. Vérifiez la route /api/nouvelle-descente/descentes.";
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
+      setListeDescentes([]);
+      addToast(errorMessage, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadInfractionStats = async () => {
-      try {
-        setLoadingStats(true);
-        const stats = await fetchInfractionStats();
-        setInfractionStats(stats);
-      } catch (error) {
-        console.error("Erreur de chargement des stats:", error);
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-
-    loadInfractionStats();
+    loadDescentes();
   }, []);
 
   const getCategoryStyle = (categorie: string) => {
@@ -362,7 +585,13 @@ const FieldActionsComponent: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value: inputValue } = e.target;
     const value = ['X_coord', 'Y_coord'].includes(name) ? parseFloat(inputValue) || 0 : inputValue;
+    
     setFormData({ ...formData, [name]: value });
+
+    // Si le champ modifié est fokontany, lancer la recherche automatique
+    if (name === 'fokontany') {
+      handleFokontanySearch(inputValue);
+    }
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -385,12 +614,26 @@ const FieldActionsComponent: React.FC = () => {
     }));
   };
 
+  const handleCheckCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      check: checked 
+        ? [...prev.check, value] 
+        : prev.check.filter(item => item !== value)
+    }));
+  };
+
   const handleRadioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, modelePV: e.target.value });
   };
 
   const resetForm = () => {
     setFormData(initialFormData);
+    setEditingMode(false);
+    setSelectedDescente(null);
+    setFokontanySuggestions([]);
+    setShowFokontanySuggestions(false);
   };
 
   const handleSubmit = async (e?: React.FormEvent<HTMLFormElement>) => {
@@ -401,8 +644,10 @@ const FieldActionsComponent: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      const infractionString = formData.check.join(', ');
+
       const descenteData = {
-        dateDescente: new Date(formData.dateDescente).toISOString(),
+        dateDescente: formData.dateDescente,
         heureDescente: formData.heureDescente,
         numeroPV: formData.numeroPV,
         reference: formData.reference,
@@ -415,7 +660,7 @@ const FieldActionsComponent: React.FC = () => {
         commune: formData.commune,
         fokontany: formData.fokontany,
         localite: formData.localite,
-        infraction: formData.infraction,
+        infraction: infractionString,
         dossierAFournir: formData.dossierAFournir,
         dateRendezVous: formData.dateRendezVous || "",
         heureRendezVous: formData.heureRendezVous || "",
@@ -431,50 +676,8 @@ const FieldActionsComponent: React.FC = () => {
       
       console.log("✅ Descente enregistrée avec succès:", result);
       
-      const nouvelleDescentePourAffichage = {
-        date_desce: new Date(formData.dateDescente),
-        actions: formData.actions.join(", "),
-        n_pv_pat: formData.modelePV === "PAT" ? formData.numeroPV : "",
-        n_fifafi: formData.modelePV === "FIFAFI" ? formData.numeroPV : "",
-        proprietai: formData.nomPersonneR,
-        commune: formData.commune,
-        localisati: formData.localite,
-        identifica: `DESC_${Date.now()}`,
-        x_coord: formData.X_coord,
-        y_coord: formData.Y_coord,
-        x_long: formData.Y_coord,
-        y_lat: formData.X_coord,
-        personne_r: formData.personneR,
-        infraction: formData.infraction,
-        reference: formData.reference,
-        heure_descente: formData.heureDescente,
-        date_rendez_vous: formData.dateRendezVous,
-        heure_rendez_vous: formData.heureRendezVous,
-        type_verbalisateur: formData.typeVerbalisateur,
-        nom_verbalisateur: formData.nomVerbalisateur,
-        nom_personne_r: formData.nomPersonneR,
-        fokontany: formData.fokontany,
-        modele_pv: formData.modelePV,
-        contact_r: formData.contactR,
-        adresse_r: formData.adresseR,
-        dossier_a_fournir: formData.dossierAFournir,
-        actions_su: "",
-        superficie: 0,
-        destinatio: "",
-        montant: 0,
-        suite_a_do: "",
-        amende_reg: 0,
-        n_pv_api: "",
-        pieces_fou: "",
-        recommanda: "",
-        Montant_1: 0,
-        Montant_2: 0,
-        observatio: `Rendez-vous: ${formData.dateRendezVous} ${formData.heureRendezVous}`,
-        situation: "",
-        situatio_1: ""
-      };
-      
-      setListeDescentes(prev => [nouvelleDescentePourAffichage, ...prev]);
+      // Recharger les données depuis le serveur
+      await loadDescentes();
       
       addToast(result.message || "Descente enregistrée avec succès !", 'success');
       
@@ -501,6 +704,11 @@ const FieldActionsComponent: React.FC = () => {
     } catch {
       return 'Date invalide';
     }
+  };
+
+  const parseInfractionToArray = (infractionString: string): string[] => {
+    if (!infractionString) return [];
+    return infractionString.split(',').map(item => item.trim()).filter(item => item !== '');
   };
 
   const filteredDescentes = listeDescentes.filter(descente => {
@@ -540,7 +748,7 @@ const FieldActionsComponent: React.FC = () => {
         />
       ))}
 
-      {/* Modal de confirmation */}
+      {/* Modal de confirmation d'enregistrement */}
       {showConfirmationModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[3000] flex justify-center items-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
@@ -567,8 +775,10 @@ const FieldActionsComponent: React.FC = () => {
                   <p><span className="font-medium">Date :</span> {formatDate(formData.dateDescente)}</p>
                   <p><span className="font-medium">Heure :</span> {formData.heureDescente}</p>
                   <p><span className="font-medium">Commune :</span> {formData.commune}</p>
+                  <p><span className="font-medium">Fokontany :</span> {formData.fokontany}</p>
+                  <p><span className="font-medium">District :</span> {formData.district}</p>
                   <p><span className="font-medium">Localité :</span> {formData.localite}</p>
-                  <p><span className="font-medium">Infraction :</span> {formData.infraction.substring(0, 50)}...</p>
+                  <p><span className="font-medium">Infraction :</span> {formData.check.join(', ')}</p>
                 </div>
               </div>
             </div>
@@ -601,6 +811,70 @@ const FieldActionsComponent: React.FC = () => {
         </div>
       )}
 
+      {/* Modal de confirmation de suppression */}
+      {deleteConfirmation.show && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[3000] flex justify-center items-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 rounded-full bg-red-100">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Confirmer la suppression</h3>
+              </div>
+              <button 
+                onClick={() => setDeleteConfirmation({show: false, descente: null})} 
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-gray-700 mb-2">
+                Êtes-vous sûr de vouloir supprimer cette descente ? Cette action est irréversible.
+              </p>
+              {deleteConfirmation.descente && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                  <h4 className="font-medium text-red-800 mb-2">Descente à supprimer :</h4>
+                  <div className="text-sm text-red-700 space-y-1">
+                    <p><span className="font-medium">Date :</span> {formatDate(deleteConfirmation.descente.date_desce)}</p>
+                    <p><span className="font-medium">Commune :</span> {deleteConfirmation.descente.commune}</p>
+                    <p><span className="font-medium">Localité :</span> {deleteConfirmation.descente.localisati}</p>
+                    <p><span className="font-medium">Infraction :</span> {deleteConfirmation.descente.infraction}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => setDeleteConfirmation({show: false, descente: null})}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isLoading}
+                className={`px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors ${
+                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Suppression...</span>
+                  </div>
+                ) : (
+                  'Supprimer'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -621,56 +895,20 @@ const FieldActionsComponent: React.FC = () => {
         </button>
       </div>
 
-      {/* Statistiques par catégorie */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {loadingStats ? (
-          Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="h-4 bg-gray-200 rounded w-24 mb-2 animate-pulse"></div>
-                  <div className="h-6 bg-gray-200 rounded w-16 mb-1 animate-pulse"></div>
-                  <div className="h-3 bg-gray-200 rounded w-20 animate-pulse"></div>
-                </div>
-                <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
-              </div>
-            </div>
-          ))
-        ) : infractionStats.length > 0 ? (
-          infractionStats.map((stat: any) => {
-            const style = getCategoryStyle(stat.categorie_consolidee);
-            return (
-              <div key={stat.categorie_consolidee} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm font-medium">
-                      {stat.categorie_consolidee}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">
-                      {stat.nombre_de_terrains}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">terrains concernés</p>
-                  </div>
-                  <div className={`p-3 rounded-full ${style.color}`}>
-                    {style.icon}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="col-span-4 text-center py-8">
-            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500">Aucune donnée d'infraction disponible</p>
-          </div>
-        )}
-      </div>
-
       {/* Formulaire de nouvelle descente */}
       {showForm && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-800 mb-6">Nouvelle Descente sur Terrain</h2>
-          <form onSubmit={(e) => { e.preventDefault(); openConfirmationModal(); }} className="space-y-6">
+          <h2 className="text-xl font-semibold text-slate-800 mb-6">
+            {editingMode ? 'Modifier la Descente' : 'Nouvelle Descente sur Terrain'}
+          </h2>
+          <form onSubmit={(e) => { 
+            e.preventDefault(); 
+            if (editingMode) {
+              handleUpdate(e);
+            } else {
+              openConfirmationModal(); 
+            }
+          }} className="space-y-6">
             {/* Actions et Modèle PV */}
             <div className="flex flex-col md:flex-row md:space-x-8 space-y-4 md:space-y-0">
               <div>
@@ -873,8 +1111,23 @@ const FieldActionsComponent: React.FC = () => {
               </div>
             </div>
 
-            {/* Localisation */}
+            {/* Localisation avec auto-complétion */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">District</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    name="district" 
+                    placeholder="District" 
+                    value={formData.district} 
+                    onChange={handleInputChange} 
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    readOnly
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Commune</label>
                 <div className="relative">
@@ -885,26 +1138,52 @@ const FieldActionsComponent: React.FC = () => {
                     placeholder="Commune" 
                     value={formData.commune} 
                     onChange={handleInputChange} 
-                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                    required 
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    readOnly
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Fokontany</label>
+              <div className="relative">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Fokontany *</label>
                 <div className="relative">
                   <Home className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <input 
                     type="text" 
                     name="fokontany" 
-                    placeholder="Fokontany" 
+                    placeholder="Commencez à taper pour rechercher..." 
                     value={formData.fokontany} 
                     onChange={handleInputChange} 
                     className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
                     required 
                   />
+                  {isSearchingFokontany && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    </div>
+                  )}
                 </div>
+                
+                {/* Suggestions de fokontany */}
+                {showFokontanySuggestions && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {fokontanySuggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        className="px-4 py-3 cursor-pointer hover:bg-blue-50 border-b border-slate-100 last:border-b-0"
+                        onClick={() => handleFokontanySelect(suggestion)}
+                      >
+                        <div className="font-medium text-slate-800">{suggestion.fokontany}</div>
+                        <div className="text-sm text-slate-600">
+                          {suggestion.commune} - {suggestion.district}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Localité</label>
                 <div className="relative">
@@ -956,20 +1235,22 @@ const FieldActionsComponent: React.FC = () => {
               </div>
             </div>
 
-            {/* Infraction */}
+            {/* Check - Cases à cocher multiples */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Infractions constatées</label>
-              <div className="relative">
-                <AlertTriangle className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
-                <textarea 
-                  name="infraction" 
-                  placeholder="Décrire les infractions constatées..." 
-                  value={formData.infraction} 
-                  onChange={handleInputChange} 
-                  rows={4} 
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" 
-                  required 
-                />
+              <label className="block text-sm font-medium text-slate-700 mb-3">Infractions constatées</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {checkOptions.map((option) => (
+                  <label key={option} className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer border border-slate-300 rounded-lg p-3 hover:bg-slate-50">
+                    <input 
+                      type="checkbox" 
+                      value={option} 
+                      checked={formData.check.includes(option)} 
+                      onChange={handleCheckCheckboxChange} 
+                      className="form-checkbox text-blue-500 rounded" 
+                    />
+                    <span>{option}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -1027,8 +1308,10 @@ const FieldActionsComponent: React.FC = () => {
               <button 
                 type="submit" 
                 disabled={isSubmitting}
-                className={`flex-grow px-6 py-2 bg-blue-500 text-white font-medium rounded-lg transition-colors ${
-                  isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
+                className={`flex-grow px-6 py-2 ${
+                  editingMode ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'
+                } text-white font-medium rounded-lg transition-colors ${
+                  isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 {isSubmitting ? (
@@ -1036,6 +1319,8 @@ const FieldActionsComponent: React.FC = () => {
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     <span>Enregistrement...</span>
                   </div>
+                ) : editingMode ? (
+                  'Mettre à jour'
                 ) : (
                   'Enregistrer la descente'
                 )}
@@ -1054,7 +1339,6 @@ const FieldActionsComponent: React.FC = () => {
           </form>
         </div>
       )}
-
       {/* Recherche et Filtres */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -1112,7 +1396,7 @@ const FieldActionsComponent: React.FC = () => {
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
             <p className="text-red-600 font-medium">{error}</p>
             <button 
-              onClick={() => window.location.reload()}
+              onClick={loadDescentes}
               className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Réessayer
@@ -1121,9 +1405,10 @@ const FieldActionsComponent: React.FC = () => {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full" style={{fontSize:"5px"}}>
+              <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
+                    <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">ID</th>
                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Date</th>
                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Localité</th>
                     <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">Coord X</th>
@@ -1136,7 +1421,10 @@ const FieldActionsComponent: React.FC = () => {
                 <tbody className="divide-y divide-gray-200">
                   {paginatedDescentes.length > 0 ? (
                     paginatedDescentes.map((descente, index) => (
-                      <tr key={descente.identifica || `index-${index}`} className="hover:bg-gray-50 transition-colors">
+                      <tr key={descente.n || `index-${index}`} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          {descente.n || 'N/A'}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900">
                             {formatDate(descente.date_desce)}
@@ -1150,9 +1438,20 @@ const FieldActionsComponent: React.FC = () => {
                           {descente.actions || 'Non spécifié'}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryStyle(descente.infraction || '').color}`}>
-                            {descente.infraction || 'Non spécifié'}
-                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {descente.infraction ? (
+                              parseInfractionToArray(descente.infraction).map((item, idx) => (
+                                <span 
+                                  key={idx}
+                                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryStyle(item).color}`}
+                                >
+                                  {item}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-gray-500 text-sm">Non spécifié</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center space-x-2">
@@ -1163,13 +1462,27 @@ const FieldActionsComponent: React.FC = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
+                            <button
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              onClick={() => handleEditClick(descente)}
+                              title="Modifier"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              onClick={() => handleDeleteClick(descente)}
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-gray-500">Aucune descente trouvée.</td>
+                      <td colSpan={8} className="text-center py-8 text-gray-500">Aucune descente trouvée.</td>
                     </tr>
                   )}
                 </tbody>
@@ -1212,7 +1525,7 @@ const FieldActionsComponent: React.FC = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden">
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Détails de la descente</h3>
+                <h3 className="text-xl font-bold text-gray-900">Détails de la descente #{selectedDescente.n}</h3>
                 <p className="text-gray-600 mt-1">Informations complètes de l'intervention</p>
               </div>
               <button 
@@ -1228,20 +1541,26 @@ const FieldActionsComponent: React.FC = () => {
                 {/* Informations de base */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ID</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-900 font-mono">{selectedDescente.n}</p>
+                    </div>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Date de descente</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-900">{formatDate(selectedDescente.date_desce)}</p>
                     </div>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Heure de descente</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-900">{selectedDescente.heure_descente || 'Non spécifié'}</p>
                     </div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Numéro PV</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -1250,10 +1569,23 @@ const FieldActionsComponent: React.FC = () => {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Référence OM</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-900">{selectedDescente.reference?.trim() || 'Non spécifié'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Modèle PV</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-gray-900">
+                        {selectedDescente.modele_pv || 
+                         (selectedDescente.n_pv_pat ? 'PAT' : 
+                          selectedDescente.n_fifafi ? 'FIFAFI' : 'Non spécifié')}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1264,9 +1596,7 @@ const FieldActionsComponent: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Type de verbalisateur</label>
                     <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <p className="text-gray-900">
-                        {selectedDescente.type_verbalisateur || 
-                         (selectedDescente.n_pv_pat ? 'PAT' : 
-                          selectedDescente.n_fifafi ? 'FIFAFI' : 'Non spécifié')}
+                        {selectedDescente.type_verbalisateur || 'Non spécifié'}
                       </p>
                     </div>
                   </div>
@@ -1394,7 +1724,20 @@ const FieldActionsComponent: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Infractions constatées</label>
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-gray-900">{selectedDescente.infraction || 'Aucune infraction spécifiée'}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedDescente.infraction ? (
+                        parseInfractionToArray(selectedDescente.infraction).map((item, idx) => (
+                          <span 
+                            key={idx}
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getCategoryStyle(item).color} text-white`}
+                          >
+                            {item}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-gray-500">Aucune infraction spécifiée</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1415,18 +1758,6 @@ const FieldActionsComponent: React.FC = () => {
                         {selectedDescente.heure_rendez_vous || 'Non spécifié'}
                       </p>
                     </div>
-                  </div>
-                </div>
-
-                {/* Modèle PV */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Modèle PV</label>
-                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-gray-900">
-                      {selectedDescente.modele_pv || 
-                       (selectedDescente.n_pv_pat ? 'PAT' : 
-                        selectedDescente.n_fifafi ? 'FIFAFI' : 'Non spécifié')}
-                    </p>
                   </div>
                 </div>
               </div>

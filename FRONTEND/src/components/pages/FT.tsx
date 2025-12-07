@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, MapPin, Clock, Eye, X, User, FileText, Search, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, Edit, Trash2, Archive, Home, Building, Target, CheckSquare, Square, Info, ServerCrash, AlertTriangle } from 'lucide-react';
 
-// Interface pour les données F.T. - AJOUT du champ deadline_complement
+// Interface pour les données F.T. - ADAPTÉE à votre structure
 export interface FTData {
   id: number;
-  rendezvous_id: number;
+  id_descente: number;
+  id_rendezvous: number;
   reference_ft: string;
   date_ft: string;
   heure_ft: string;
@@ -13,30 +14,35 @@ export interface FTData {
   cin: string;
   contact: string;
   adresse: string;
-  titre_terrain?: string;
-  nomproprietaire?: string; // MODIFICATION: 'im' remplacé par 'nomproprietaire'
-  localisation?: string;
-  superficie?: number;
-  motif?: string;
-  lieu?: string;
-  but?: string;
-  mesure?: string;
-  dossier_type: string[];
-  id_descente?: string;
-  num_pv?: string;
-  commune: string;
-  fokotany?: string;
-  localite?: string;
-  coord_x?: number;
-  coord_y?: number;
-  infraction?: string;
-  dossier?: string;
+  titre_terrain: string;
+  nomproprietaire: string;
+  superficie: number;
+  motif: string;
+  lieu: string;
+  but: string;
+  mesure: string;
+  dossier_type: string;
+  num_pv: string;
+  dossier: string;
   status_dossier: 'En cours' | 'Traité' | 'Archivé' | 'Annulé';
-  missing_dossiers?: string[];
-  deadline_complement?: string; // AJOUT: Date limite pour compléter les dossiers
-  duration_complement?: number; // AJOUT: Durée en jours pour compléter
+  missing_dossires: string[];
+  deadline_complement: string;
+  duration_complement: number;
   created_at: string;
   updated_at: string;
+  // Champs joints depuis les autres tables
+  reference_descente?: string;
+  commune?: string;
+  fokontany?: string;
+  localisati?: string;
+  infraction?: string;
+  nom_verbalisateur?: string;
+  date_rendez_vous?: string;
+  heure_rendez_vous?: string;
+  statut_rendezvous?: string;
+  nom_personne_r?: string;
+  coord_x?: string;
+  coord_y?: string;
 }
 
 // Type pour les statistiques des cartes
@@ -70,7 +76,7 @@ interface ConfirmationModalState {
 /* COMPOSANTS UI                               */
 /* -------------------------------------------------------------------------- */
 
-// Composant Modal de Confirmation (simulé)
+// Composant Modal de Confirmation
 const ConfirmationModal: React.FC<{ modal: ConfirmationModalState, closeModal: () => void, executeAction: () => void }> = ({ modal, closeModal, executeAction }) => {
   if (!modal.show) return null;
 
@@ -143,7 +149,7 @@ const ViewModal: React.FC<{ ft: FTData | null, onClose: () => void, formatters: 
 
         {/* Content */}
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto flex-grow">
-          {/* Section I: Rendez-vous et Personne Convoquée */}
+          {/* Section I: Informations Générales */}
           <div className="md:col-span-2 space-y-4 border-b pb-4">
             <h4 className="text-lg font-bold text-blue-600 border-b border-blue-100 pb-2">Informations Générales</h4>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
@@ -166,16 +172,16 @@ const ViewModal: React.FC<{ ft: FTData | null, onClose: () => void, formatters: 
           {/* Section II: Localisation et Terrain */}
           <div className="space-y-4 border-b pb-4">
             <h4 className="text-lg font-bold text-blue-600 border-b border-blue-100 pb-2">Localisation & Terrain</h4>
-            <DetailItem icon={<Home className="w-5 h-5" />} label="Commune / Fokotany / Localité" value={`${ft.commune} / ${ft.fokotany || 'N/A'} / ${ft.localite || 'N/A'}`} />
+            <DetailItem icon={<Home className="w-5 h-5" />} label="Commune / Fokontany / Localité" value={`${ft.commune || 'N/A'} / ${ft.fokontany || 'N/A'} / ${ft.localisati || 'N/A'}`} />
             <DetailItem icon={<Target className="w-5 h-5" />} label="Coordonnées (X, Y)" value={ft.coord_x && ft.coord_y ? `${ft.coord_x}, ${ft.coord_y}` : 'Non spécifié'} />
             <DetailItem icon={<Building className="w-5 h-5" />} label="Titre Terrain / Nom Propriétaire" value={ft.titre_terrain && ft.nomproprietaire ? `${ft.titre_terrain} (Propriétaire: ${ft.nomproprietaire})` : 'Non spécifié'} />
-            <DetailItem icon={<Square className="w-5 h-5" />} label="Superficie / Localisation" value={ft.superficie ? `${ft.superficie} m² / ${ft.localisation || 'N/A'}` : 'Non spécifié'} />
+            <DetailItem icon={<Square className="w-5 h-5" />} label="Superficie" value={ft.superficie ? `${ft.superficie} m²` : 'Non spécifié'} />
           </div>
 
           {/* Section III: Motif et Mesures */}
           <div className="space-y-4 border-b pb-4">
             <h4 className="text-lg font-bold text-blue-600 border-b border-blue-100 pb-2">Motif et Suivi</h4>
-            <DetailItem icon={<FileText className="w-5 h-5" />} label="Types de Dossier" value={formatDossierTypes(ft.dossier_type)} />
+            <DetailItem icon={<FileText className="w-5 h-5" />} label="Type de Dossier" value={ft.dossier_type} />
             <DetailItem icon={<Info className="w-5 h-5" />} label="Motif / Lieu / But" value={`${ft.motif || 'N/A'} / ${ft.lieu || 'N/A'} / ${ft.but || 'N/A'}`} />
             <DetailItem icon={<CheckSquare className="w-5 h-5" />} label="Mesures prises" value={ft.mesure} />
             <DetailItem icon={<AlertCircle className="w-5 h-5" />} label="Infraction" value={ft.infraction} />
@@ -187,7 +193,7 @@ const ViewModal: React.FC<{ ft: FTData | null, onClose: () => void, formatters: 
             <DetailItem icon={<FileText className="w-5 h-5" />} label="Dossiers Manquants" value={formatMissingDossiers(ft)} />
             <DetailItem icon={<FileText className="w-5 h-5" />} label="Numéro PV / ID Descente" value={ft.num_pv && ft.id_descente ? `PV: ${ft.num_pv} / ID Descente: ${ft.id_descente}` : 'Non spécifié'} />
             
-            {/* AJOUT: Affichage de la date limite */}
+            {/* Affichage de la date limite */}
             {ft.deadline_complement && (
               <DetailItem 
                 icon={<AlertTriangle className="w-5 h-5" />} 
@@ -277,19 +283,12 @@ const FTComponent: React.FC = () => {
   const formatters = useMemo(() => {
     // Fonction pour déterminer si un dossier est régularisé
     const isDossierRegularise = (ft: FTData): boolean => {
-      return !ft.missing_dossiers || ft.missing_dossiers.length === 0;
+      return !ft.missing_dossires || ft.missing_dossires.length === 0;
     };
   
     // Fonction pour obtenir le statut de régularisation
     const getStatutRegularisation = (ft: FTData): string => {
       return isDossierRegularise(ft) ? 'Régularisé' : 'Irrégularisé';
-    };
-  
-    // Fonction pour obtenir la couleur du statut de régularisation
-    const getStatutRegularisationColor = (ft: FTData): string => {
-      return isDossierRegularise(ft)  
-        ? 'bg-green-100 text-green-800 border-green-400'  
-        : 'bg-red-100 text-red-800 border-red-400';
     };
   
     // Fonctions utilitaires pour le statut
@@ -371,10 +370,10 @@ const FTComponent: React.FC = () => {
       }
     };
   
-    // Formater les types de dossier
-    const formatDossierTypes = (types: string[]): string => {
-      if (!types || types.length === 0) return 'Aucun type spécifié';
-      return types.join(', ');
+    // Formater les types de dossier (maintenant une chaîne simple)
+    const formatDossierTypes = (types: string): string => {
+      if (!types) return 'Aucun type spécifié';
+      return types;
     };
   
     // Formater les dossiers manquants
@@ -383,8 +382,8 @@ const FTComponent: React.FC = () => {
         return 'Aucun dossier manquant';
       }
       
-      if (ft.missing_dossiers && ft.missing_dossiers.length > 0) {
-        return ft.missing_dossiers.join(', ');
+      if (ft.missing_dossires && ft.missing_dossires.length > 0) {
+        return ft.missing_dossires.join(', ');
       }
       
       return 'Aucun dossier manquant';
@@ -392,10 +391,10 @@ const FTComponent: React.FC = () => {
     
     // Fonction utilitaire pour vérifier si un dossier a des dossiers manquants
     const hasMissingDossiers = (ft: FTData) => {
-      return ft.missing_dossiers && ft.missing_dossiers.length > 0;
+      return ft.missing_dossires && ft.missing_dossires.length > 0;
     };
 
-    // NOUVELLE FONCTION: Vérifier si la date limite est dépassée
+    // Vérifier si la date limite est dépassée
     const isDeadlinePassed = (deadline: string): boolean => {
       if (!deadline) return false;
       try {
@@ -408,21 +407,21 @@ const FTComponent: React.FC = () => {
       }
     };
 
-    // NOUVELLE FONCTION: Vérifier si un FT a une date limite dépassée
+    // Vérifier si un FT a une date limite dépassée
     const hasDeadlinePassed = (ft: FTData): boolean => {
       return ft.deadline_complement ? isDeadlinePassed(ft.deadline_complement) : false;
     };
 
     return { 
-      isDossierRegularise, getStatutRegularisation, getStatutRegularisationColor, 
+      isDossierRegularise, getStatutRegularisation, 
       getStatusColorAndIcon, getStatutLabel, formatDate, formatTime, 
       formatDossierTypes, formatMissingDossiers, hasMissingDossiers,
-      isDeadlinePassed, hasDeadlinePassed // AJOUT des nouvelles fonctions
+      isDeadlinePassed, hasDeadlinePassed
     };
   }, []);
 
   const {
-    isDossierRegularise, getStatutRegularisation, getStatutRegularisationColor, 
+    isDossierRegularise, getStatutRegularisation, 
     getStatusColorAndIcon, getStatutLabel, formatDate, formatTime, 
     formatDossierTypes, formatMissingDossiers, hasMissingDossiers,
     isDeadlinePassed, hasDeadlinePassed
@@ -430,14 +429,13 @@ const FTComponent: React.FC = () => {
   
   /* ---------------------------- Fonctions de Fetch --------------------------- */
 
-  // Fetch des statistiques - VERSION SIMPLIFIÉE SANS TOAST
+  // Fetch des statistiques
   const fetchStats = useCallback(async () => {
     try {
       setLoadingStats(true);
       
       console.log('🔄 Tentative de récupération des statistiques...');
       
-      // ESSAYER D'ABORD L'API RÉELLE
       try {
         const response = await fetch('http://localhost:3000/api/ft/stats');
         
@@ -446,34 +444,33 @@ const FTComponent: React.FC = () => {
           console.log('✅ API Stats fonctionne:', json);
           
           if (json.success && json.data) {
-            // UTILISER LES VRAIES DONNÉES DE L'API
             const apiStats = json.data;
             
             const statsData: StatCard[] = [
               {
                 categorie_consolidee: 'Dossiers Régularisés',
-                nombre_de_dossiers: apiStats.dossiers_regularises,
-                pourcentage: apiStats.pourcentage_regularises,
+                nombre_de_dossiers: apiStats.dossiers_regularises || 0,
+                pourcentage: apiStats.pourcentage_regularises || 0,
                 couleur: 'bg-green-500',
                 icone: <CheckCircle className="w-8 h-8 text-white" />
               },
               {
                 categorie_consolidee: 'Dossiers Irrégularisés',
-                nombre_de_dossiers: apiStats.dossiers_irregularises,
-                pourcentage: apiStats.pourcentage_irregularises,
+                nombre_de_dossiers: apiStats.dossiers_irregularises || 0,
+                pourcentage: apiStats.pourcentage_irregularises || 0,
                 couleur: 'bg-orange-500',
                 icone: <AlertCircle className="w-8 h-8 text-white" />
               },
               {
                 categorie_consolidee: 'En Cours',
-                nombre_de_dossiers: apiStats.en_cours,
-                pourcentage: apiStats.pourcentage_en_cours,
+                nombre_de_dossiers: apiStats.en_cours || 0,
+                pourcentage: apiStats.pourcentage_en_cours || 0,
                 couleur: 'bg-blue-500',
                 icone: <Clock className="w-8 h-8 text-white" />
               },
               {
                 categorie_consolidee: 'Total F.T.',
-                nombre_de_dossiers: apiStats.total,
+                nombre_de_dossiers: apiStats.total || 0,
                 pourcentage: 100,
                 couleur: 'bg-indigo-500',
                 icone: <FileText className="w-8 h-8 text-white" />
@@ -481,50 +478,47 @@ const FTComponent: React.FC = () => {
             ];
             
             setStats(statsData);
-            setTotalFT(apiStats.total);
-            return; // Sortir si l'API fonctionne
+            setTotalFT(apiStats.total || 0);
+            return;
           }
-        } else {
-          console.log('❌ API Stats retourne une erreur:', response.status);
-          throw new Error(`Erreur ${response.status}`);
         }
       } catch (apiError) {
         console.log('❌ Erreur API Stats:', apiError);
-        // Continuer vers les données mockées en cas d'erreur
       }
       
-      // FALLBACK : DONNÉES MOCKÉES SEULEMENT SI L'API ÉCHOUE
-      console.log('📊 Utilisation des données mockées (backend en erreur)');
+      // Fallback vers des données mockées
+      console.log('📊 Utilisation des données mockées');
       
       const mockStats = {
-        total: 12,
-        en_cours: 8,
-        dossiers_regularises: 7,
-        dossiers_irregularises: 5,
-        pourcentage_regularises: 58,
-        pourcentage_irregularises: 42,
-        pourcentage_en_cours: 67
+        total: ftList.length,
+        en_cours: ftList.filter(ft => ft.status_dossier === 'En cours').length,
+        dossiers_regularises: ftList.filter(ft => isDossierRegularise(ft)).length,
+        dossiers_irregularises: ftList.filter(ft => !isDossierRegularise(ft)).length,
       };
+      
+      const pourcentage_regularises = mockStats.total > 0 ? Math.round((mockStats.dossiers_regularises / mockStats.total) * 100) : 0;
+      const pourcentage_irregularises = mockStats.total > 0 ? Math.round((mockStats.dossiers_irregularises / mockStats.total) * 100) : 0;
+      const pourcentage_en_cours = mockStats.total > 0 ? Math.round((mockStats.en_cours / mockStats.total) * 100) : 0;
       
       const statsData: StatCard[] = [
         {
           categorie_consolidee: 'Dossiers Régularisés',
           nombre_de_dossiers: mockStats.dossiers_regularises,
-          pourcentage: mockStats.pourcentage_regularises,
+          pourcentage: pourcentage_regularises,
           couleur: 'bg-green-500',
           icone: <CheckCircle className="w-8 h-8 text-white" />
         },
         {
           categorie_consolidee: 'Dossiers Irrégularisés',
           nombre_de_dossiers: mockStats.dossiers_irregularises,
-          pourcentage: mockStats.pourcentage_irregularises,
+          pourcentage: pourcentage_irregularises,
           couleur: 'bg-orange-500',
           icone: <AlertCircle className="w-8 h-8 text-white" />
         },
         {
           categorie_consolidee: 'En Cours',
           nombre_de_dossiers: mockStats.en_cours,
-          pourcentage: mockStats.pourcentage_en_cours,
+          pourcentage: pourcentage_en_cours,
           couleur: 'bg-blue-500',
           icone: <Clock className="w-8 h-8 text-white" />
         },
@@ -545,7 +539,7 @@ const FTComponent: React.FC = () => {
     } finally {
       setLoadingStats(false);
     }
-  }, []);
+  }, [ftList, isDossierRegularise]);
 
   // Fetch des F.T.
   const fetchFT = useCallback(async () => {
@@ -579,8 +573,13 @@ const FTComponent: React.FC = () => {
 
   useEffect(() => {
     fetchFT();
-    fetchStats();
-  }, [fetchFT, fetchStats]);
+  }, [fetchFT]);
+
+  useEffect(() => {
+    if (ftList.length > 0) {
+      fetchStats();
+    }
+  }, [ftList, fetchStats]);
 
   /* ---------------------------- Fonctions d'Actions -------------------------- */
 
@@ -604,10 +603,11 @@ const FTComponent: React.FC = () => {
     });
   }, []);
 
-  // Fonction pour valider les dossiers cochés
+  // Fonction pour valider les dossiers cochés - CORRIGÉE
   const handleValidateCheckedDossiers = useCallback(async (ftId: number) => {
     const checked = checkedDossiers[ftId] || [];
     if (checked.length === 0) {
+      alert("Veuillez cocher au moins un dossier à valider");
       return;
     }
 
@@ -617,15 +617,27 @@ const FTComponent: React.FC = () => {
       const ft = ftList.find(f => f.id === ftId);
       if (!ft) return;
 
-      const currentMissing = ft.missing_dossiers || [];
-      const updatedMissing = currentMissing.filter(d => !checked.includes(d));
+      const currentMissing = ft.missing_dossires || [];
+      
+      // VÉRIFICATION : S'assurer que les dossiers cochés existent bien dans la liste des manquants
+      const validCheckedDossiers = checked.filter(dossier => 
+        currentMissing.includes(dossier)
+      );
+
+      if (validCheckedDossiers.length === 0) {
+        alert("Aucun dossier valide à valider");
+        return;
+      }
+
+      // Mettre à jour la liste des dossiers manquants en retirant ceux cochés
+      const updatedMissing = currentMissing.filter(d => !validCheckedDossiers.includes(d));
       
       const response = await fetch(`http://localhost:3000/api/ft/${ftId}/missing-dossiers`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ missing_dossiers: updatedMissing }),
+        body: JSON.stringify({ missing_dossires: updatedMissing }),
       });
 
       if (!response.ok) {
@@ -635,6 +647,7 @@ const FTComponent: React.FC = () => {
       const json = await response.json();
       
       if (json.success) {
+        // Mettre à jour l'état local
         setFtList(prev => prev.map(ft => {
           if (ft.id === ftId) {
             return json.data;
@@ -642,68 +655,28 @@ const FTComponent: React.FC = () => {
           return ft;
         }));
         
+        // Réinitialiser les cases cochées pour ce FT
         setCheckedDossiers(prev => ({
           ...prev,
           [ftId]: []
         }));
         
+        // Recharger les statistiques
         fetchStats();
+        
+        console.log(`✅ Dossiers validés avec succès: ${validCheckedDossiers.join(', ')}`);
       }
     } catch (error) {
       console.error('Erreur lors de la validation des dossiers:', error);
+      alert("Erreur lors de la validation des dossiers");
     } finally {
       setIsSubmitting(false);
     }
   }, [checkedDossiers, ftList, fetchStats]);
 
-  // Fonction pour ajouter un dossier manquant
-  const handleAddMissingDossier = useCallback(async (ftId: number, dossier: string) => {
-    if (!dossier.trim()) {
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      
-      const response = await fetch(`http://localhost:3000/api/ft/${ftId}/missing-dossiers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ dossier: dossier.trim() }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'ajout du dossier manquant');
-      }
-
-      const json = await response.json();
-      
-      if (json.success) {
-        setFtList(prev => prev.map(ft => {
-          if (ft.id === ftId) {
-            const currentMissing = ft.missing_dossiers || [];
-            return {
-              ...ft,
-              missing_dossiers: [...currentMissing, dossier.trim()]
-            };
-          }
-          return ft;
-        }));
-        
-        fetchStats();
-      }
-    } catch (error) {
-      console.error('Erreur lors de l\'ajout du dossier manquant:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [fetchStats]);
-
   // Gérer la vue des détails
   const handleViewClick = useCallback(async (ft: FTData) => {
     try {
-      // Re-fetch des détails pour s'assurer que les données sont les plus récentes
       const response = await fetch(`http://localhost:3000/api/ft/${ft.id}`);
       if (response.ok) {
         const json = await response.json();
@@ -713,12 +686,11 @@ const FTComponent: React.FC = () => {
           return;
         }
       }
-      // Si le fetch échoue ou n'est pas successful, utiliser l'objet FT existant
       setSelectedFT(ft);
       setShowModal(true);
     } catch (error) {
       console.error('Erreur lors du chargement des détails:', error);
-      setSelectedFT(ft); // Afficher les détails locaux en cas d'erreur réseau
+      setSelectedFT(ft);
       setShowModal(true);
     }
   }, []);
@@ -761,6 +733,11 @@ const FTComponent: React.FC = () => {
     return (checkedDossiers[ftId] || []).length;
   }, [checkedDossiers]);
 
+  // Fonction pour vérifier si un dossier spécifique est coché
+  const isDossierChecked = useCallback((ftId: number, dossier: string) => {
+    return (checkedDossiers[ftId] || []).includes(dossier);
+  }, [checkedDossiers]);
+
   // Toggle selection
   const toggleSelectFT = useCallback((id: number) => {
     setSelectedFTs(prev =>
@@ -782,7 +759,7 @@ const FTComponent: React.FC = () => {
       const matchesSearch = 
         ft.reference_ft.toLowerCase().includes(searchLower) ||
         ft.nom_complet.toLowerCase().includes(searchLower) ||
-        ft.commune.toLowerCase().includes(searchLower) ||
+        (ft.commune && ft.commune.toLowerCase().includes(searchLower)) ||
         (ft.infraction && ft.infraction.toLowerCase().includes(searchLower));
       
       return matchesFilter && matchesSearch;
@@ -812,7 +789,7 @@ const FTComponent: React.FC = () => {
     });
   }, []);
 
-  // Grouped by statut de régularisation avec useMemo - AJOUT de la catégorie "Date limite dépassée"
+  // Grouped by statut de régularisation avec useMemo
   const { groupedFT, sortedGroups } = useMemo(() => {
     const grouped = filteredFT.reduce((acc, ft) => {
       let statut = getStatutRegularisation(ft);
@@ -947,7 +924,7 @@ const FTComponent: React.FC = () => {
         )}
       </div>
 
-      {/* Filters - AJOUT du filtre "Date limite dépassée" */}
+      {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
           <div className="flex items-center space-x-4">
@@ -980,7 +957,7 @@ const FTComponent: React.FC = () => {
         </div>
       </div>
 
-      {/* F.T. List Grouped by Statut de Régularisation - AJOUT de la catégorie "Date limite dépassée" */}
+      {/* F.T. List Grouped by Statut de Régularisation */}
       <div className="space-y-4">
         {sortedGroups.map(([statut, statutFT]) => {
           const currentPage = pagination[statut] || 1;
@@ -1046,7 +1023,7 @@ const FTComponent: React.FC = () => {
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Référence</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Date/Heure</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Commune</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Types Dossier</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Type Dossier</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Statut Dossier</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Dossiers Manquants</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Date Limite</th>
@@ -1092,10 +1069,10 @@ const FTComponent: React.FC = () => {
                           <td className="px-4 py-3 text-sm text-gray-600">
                             <div className="flex items-center space-x-2">
                               <MapPin className="w-4 h-4 text-gray-400" />
-                              <span>{ft.commune}</span>
+                              <span>{ft.commune || 'N/A'}</span>
                             </div>
-                            {ft.fokotany && (
-                              <p className="text-xs text-gray-500 mt-1">{ft.fokotany}</p>
+                            {ft.fokontany && (
+                              <p className="text-xs text-gray-500 mt-1">{ft.fokontany}</p>
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
@@ -1112,19 +1089,19 @@ const FTComponent: React.FC = () => {
                             </span>
                           </td>
                           
-                          {/* Colonne Dossiers Manquants */}
+                          {/* Colonne Dossiers Manquants - CORRIGÉE */}
                           <td className="px-4 py-3 text-sm text-gray-600">
                             <div className="max-w-xs">
                               {hasMissingDossiers(ft) ? (
                                 <div className="space-y-3">
                                   {/* Liste des dossiers manquants avec cases à cocher */}
                                   <div className="space-y-2">
-                                    {ft.missing_dossiers?.map(dossier => (
+                                    {ft.missing_dossires?.map(dossier => (
                                       <div key={dossier} className="flex items-center text-xs space-x-2">
                                         <input
                                           id={`dossier-${ft.id}-${dossier}`}
                                           type="checkbox"
-                                          checked={checkedDossiers[ft.id]?.includes(dossier) || false}
+                                          checked={isDossierChecked(ft.id, dossier)}
                                           onChange={() => toggleDossierCheck(ft.id, dossier)}
                                           className="rounded text-green-600 border-gray-300 focus:ring-green-500"
                                         />
@@ -1133,14 +1110,39 @@ const FTComponent: React.FC = () => {
                                         </label>
                                       </div>
                                     ))}
+                                    
+                                    {/* Bouton de validation - TOUJOURS visible si des dossiers sont cochés */}
                                     {getCheckedCount(ft.id) > 0 && (
-                                      <button
-                                        onClick={() => handleValidateCheckedDossiers(ft.id)}
-                                        disabled={isSubmitting}
-                                        className="mt-2 w-full flex items-center justify-center px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-                                      >
-                                        {isSubmitting ? 'Validation...' : `Valider (${getCheckedCount(ft.id)})`}
-                                      </button>
+                                      <div className="space-y-2">
+                                        <button
+                                          onClick={() => handleValidateCheckedDossiers(ft.id)}
+                                          disabled={isSubmitting}
+                                          className={`w-full flex items-center justify-center px-3 py-1 text-xs font-medium text-white rounded-lg transition-colors ${
+                                            getCheckedCount(ft.id) === ft.missing_dossires?.length
+                                              ? 'bg-green-600 hover:bg-green-700'
+                                              : 'bg-blue-600 hover:bg-blue-700'
+                                          } disabled:opacity-50`}
+                                        >
+                                          {isSubmitting ? (
+                                            'Validation...'
+                                          ) : (
+                                            <>
+                                              <CheckCircle className="w-3 h-3 mr-1" />
+                                              {getCheckedCount(ft.id) === ft.missing_dossires?.length
+                                                ? `Valider tous les dossiers (${getCheckedCount(ft.id)})`
+                                                : `Valider ${getCheckedCount(ft.id)} dossier(s)`
+                                              }
+                                            </>
+                                          )}
+                                        </button>
+                                        
+                                        {/* Message informatif */}
+                                        {getCheckedCount(ft.id) < ft.missing_dossires?.length && (
+                                          <p className="text-xs text-blue-600 text-center">
+                                            {ft.missing_dossires?.length - getCheckedCount(ft.id)} dossier(s) restant(s)
+                                          </p>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -1153,7 +1155,7 @@ const FTComponent: React.FC = () => {
                             </div>
                           </td>
                           
-                          {/* NOUVELLE COLONNE: Date Limite */}
+                          {/* Colonne Date Limite */}
                           <td className="px-4 py-3 text-sm">
                             {ft.deadline_complement ? (
                               <div className={`flex flex-col items-start space-y-1 ${
@@ -1175,7 +1177,7 @@ const FTComponent: React.FC = () => {
                             )}
                           </td>
                           
-                          {/* Colonne Actions (Visualisation et Suppression seulement) */}
+                          {/* Colonne Actions */}
                           <td className="px-4 py-3 text-sm text-gray-600">
                             <div className="flex items-center space-x-2">
                               {/* Icône de Visualisation */}

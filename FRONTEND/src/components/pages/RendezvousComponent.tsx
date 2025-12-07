@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, MapPin, Clock, Eye, X, User, FileText, Search, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import FaireFT from './FaireFT';
 import MiseEnDemeureModal from './MiseEnDemeureModal';
+import { toast } from 'react-toastify';
 
 export interface Rendezvous {
   id: string;
@@ -47,7 +48,7 @@ const RendezvousComponent: React.FC = () => {
   const [rdvToValidate, setRdvToValidate] = useState<Rendezvous | null>(null);
   const [showMiseEnDemeureModal, setShowMiseEnDemeureModal] = useState(false);
   const [selectedRdvForMiseEnDemeure, setSelectedRdvForMiseEnDemeure] = useState<Rendezvous | null>(null);
-  
+ 
   const [filter, setFilter] = useState<'all' | Rendezvous['statut']>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRdv, setSelectedRdv] = useState<string[]>([]);
@@ -56,17 +57,15 @@ const RendezvousComponent: React.FC = () => {
   const [totalRendezvous, setTotalRendezvous] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  
+ 
   const [pagination, setPagination] = useState<PaginationState>({
     'En cours': 1,
     'Avec comparution': 1,
     'Non comparution': 1,
     'Ready': 1
   });
-
   const statusOrder: Rendezvous['statut'][] = ['En cours', 'Avec comparution', 'Non comparution'];
   const ITEMS_PER_PAGE = 5;
-
   // Fetch des rendez-vous
   const fetchRendezvous = useCallback(async () => {
     try {
@@ -75,13 +74,11 @@ const RendezvousComponent: React.FC = () => {
       if (searchTerm && searchTerm.trim().length >= 2) {
         url = `http://localhost:3000/api/rendezvous/search/${encodeURIComponent(searchTerm.trim())}`;
       }
-
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Erreur réseau');
       }
       const json = await response.json();
-
       if (json.success) {
         setRendezvous(json.data.map((rdv: any) => ({
           ...rdv,
@@ -99,7 +96,6 @@ const RendezvousComponent: React.FC = () => {
       setIsLoading(false);
     }
   }, [searchTerm]);
-
   // Fetch des statistiques
   const fetchStats = useCallback(async () => {
     try {
@@ -109,7 +105,6 @@ const RendezvousComponent: React.FC = () => {
         throw new Error('Erreur réseau');
       }
       const json = await response.json();
-
       if (json.success) {
         const stats: StatCard[] = [
           {
@@ -134,12 +129,11 @@ const RendezvousComponent: React.FC = () => {
       setLoadingStats(false);
     }
   }, []);
-
   // Fonction pour envoyer la mise en demeure
   const handleSendMiseEnDemeure = useCallback(async (rdvId: string, newDate?: string, newHeure?: string) => {
     try {
       setIsLoading(true);
-      
+     
       const response = await fetch(`http://localhost:3000/api/rendezvous/${rdvId}/mise-en-demeure`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,17 +143,15 @@ const RendezvousComponent: React.FC = () => {
           is_mise_en_demeure: true
         })
       });
-
       if (!response.ok) {
         throw new Error('Erreur lors de l\'envoi de la mise en demeure');
       }
-
       const json = await response.json();
       if (json.success) {
         // Mettre à jour l'état local - changer le statut en "En cours" et ajouter le marqueur
-        setRendezvous(prev => prev.map(rdv => 
-          rdv.id === rdvId ? { 
-            ...rdv, 
+        setRendezvous(prev => prev.map(rdv =>
+          rdv.id === rdvId ? {
+            ...rdv,
             statut: 'En cours',
             is_mise_en_demeure: true,
             mise_en_demeure_sent: true,
@@ -167,25 +159,24 @@ const RendezvousComponent: React.FC = () => {
             heure_rendez_vous: newHeure || rdv.heure_rendez_vous
           } : rdv
         ));
-        
+       
         // Fermer le modal
         setShowMiseEnDemeureModal(false);
         setSelectedRdvForMiseEnDemeure(null);
-        
+       
         // Recharger les données
         fetchRendezvous();
         fetchStats();
-        
-        alert('Mise en demeure envoyée avec succès - Le statut est maintenant "En cours"');
+       
+        toast.success('Mise en demeure envoyée avec succès - Le statut est maintenant "En cours"');
       }
     } catch (error) {
       console.error('Erreur lors de l\'envoi de la mise en demeure:', error);
-      alert('Erreur lors de l\'envoi de la mise en demeure');
+      toast.error('Erreur lors de l\'envoi de la mise en demeure');
     } finally {
       setIsLoading(false);
     }
   }, [fetchRendezvous, fetchStats]);
-
   // Fonction pour normaliser les statuts
   const normalizeStatut = useCallback((statut: string): Rendezvous['statut'] => {
     const lowerStatut = statut.toLowerCase();
@@ -194,11 +185,10 @@ const RendezvousComponent: React.FC = () => {
     if (lowerStatut.includes('avec comparution') || lowerStatut === 'avec comparution') return 'Avec comparution';
     return 'En cours';
   }, []);
-
   // Fonctions utilitaires pour le statut
   const getStatusColorAndIcon = useCallback((statutOrCategory: string) => {
     const lowerCase = statutOrCategory.toLowerCase();
-    
+   
     if (lowerCase.includes('en cours') || lowerCase === 'en cours') {
       return { color: 'bg-blue-500', text: 'text-blue-600', border: 'border-blue-500', icon: <Clock className="w-8 h-8 text-white" /> };
     } else if (lowerCase.includes('non-comparution') || lowerCase === 'non comparution') {
@@ -213,11 +203,10 @@ const RendezvousComponent: React.FC = () => {
       return { color: 'bg-gray-500', text: 'text-gray-600', border: 'border-gray-500', icon: <AlertCircle className="w-8 h-8 text-white" /> };
     }
   }, []);
-  
+ 
   const getStatutLabel = useCallback((statut: Rendezvous['statut']) => {
     return statut;
   }, []);
-
   const getStatutIcon = useCallback((statut: Rendezvous['statut']) => {
     switch (statut) {
       case 'Avec comparution': return <CheckCircle className="w-5 h-5 text-green-600" />;
@@ -226,7 +215,6 @@ const RendezvousComponent: React.FC = () => {
       default: return <Calendar className="w-5 h-5 text-gray-600" />;
     }
   }, []);
-
   const getStatusColor = useCallback((statut: Rendezvous['statut']) => {
     switch (statut) {
       case 'Avec comparution': return 'bg-green-100 text-green-800 border-green-400';
@@ -235,25 +223,24 @@ const RendezvousComponent: React.FC = () => {
       default: return 'bg-gray-100 text-gray-800 border-gray-400';
     }
   }, []);
-
   // Fonction robuste pour parser l'heure
   const parseHeure = useCallback((heureString: string): { hours: number, minutes: number } | null => {
     if (!heureString) return null;
-    
+   
     try {
       const cleanHeure = heureString.trim();
-      
+     
       let hours: number, minutes: number;
-      
+     
       if (cleanHeure.includes(':') || cleanHeure.includes('h') || cleanHeure.includes('H')) {
         const separator = cleanHeure.includes(':') ? ':' : (cleanHeure.includes('h') ? 'h' : 'H');
         const parts = cleanHeure.split(separator);
-        
+       
         hours = parseInt(parts[0]);
         minutes = parts[1] ? parseInt(parts[1].substring(0, 2)) : 0;
       } else if (/^\d+$/.test(cleanHeure)) {
         const timeNum = parseInt(cleanHeure);
-        
+       
         if (cleanHeure.length <= 2) {
           hours = timeNum;
           minutes = 0;
@@ -267,40 +254,39 @@ const RendezvousComponent: React.FC = () => {
       } else {
         return null;
       }
-      
+     
       if (isNaN(hours) || isNaN(minutes)) {
         return null;
       }
-      
+     
       if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
         return null;
       }
-      
+     
       return { hours, minutes };
-      
+     
     } catch (error) {
       return null;
     }
   }, []);
-
   // Fonction pour créer un objet Date à partir de la date du rendez-vous
   const getRendezvousDate = useCallback((rdv: Rendezvous): Date => {
     try {
       const cleanDate = rdv.date_rendez_vous.trim();
-      
+     
       if (!cleanDate) {
         return new Date('invalid');
       }
-      
+     
       if (cleanDate.includes('T')) {
         const isoDate = new Date(cleanDate);
         if (!isNaN(isoDate.getTime())) {
           return isoDate;
         }
       }
-      
+     
       let day: number, month: number, year: number;
-      
+     
       if (cleanDate.includes('/')) {
         const parts = cleanDate.split('/');
         if (parts.length !== 3) {
@@ -326,47 +312,46 @@ const RendezvousComponent: React.FC = () => {
       } else {
         return new Date('invalid');
       }
-      
+     
       const fullYear = year < 100 ? 2000 + year : year;
-      
+     
       if (isNaN(day) || isNaN(month) || isNaN(fullYear)) {
         return new Date('invalid');
       }
-      
+     
       if (day < 1 || day > 31 || month < 0 || month > 11 || fullYear < 2000 || fullYear > 2100) {
         return new Date('invalid');
       }
-      
+     
       const date = new Date(fullYear, month, day);
-      
+     
       if (isNaN(date.getTime())) {
         return new Date('invalid');
       }
-      
+     
       return date;
-      
+     
     } catch (error) {
       return new Date('invalid');
     }
   }, []);
-
   // Formater la date de manière cohérente
   const formatDate = useCallback((dateString: string): string => {
     if (!dateString) return 'Non spécifié';
-    
+   
     try {
       let date: Date;
-      
+     
       const cleanDate = dateString.trim();
-      
+     
       if (cleanDate.includes('/')) {
         const [dayStr, monthStr, yearStr] = cleanDate.split('/');
         const day = parseInt(dayStr);
         const month = parseInt(monthStr) - 1;
         const year = parseInt(yearStr);
-        
+       
         const fullYear = year < 100 ? 2000 + year : year;
-        
+       
         date = new Date(fullYear, month, day);
       } else if (cleanDate.includes('-')) {
         const parts = cleanDate.split('-');
@@ -383,11 +368,11 @@ const RendezvousComponent: React.FC = () => {
       } else {
         return 'Format invalide';
       }
-      
+     
       if (isNaN(date.getTime())) {
         return 'Date invalide';
       }
-      
+     
       return date.toLocaleDateString('fr-FR', {
         day: '2-digit',
         month: '2-digit',
@@ -397,106 +382,101 @@ const RendezvousComponent: React.FC = () => {
       return 'Date invalide';
     }
   }, []);
-
   // Formater l'heure
   const formatTime = useCallback((timeString: string): string => {
     const heureParsed = parseHeure(timeString);
     if (!heureParsed) {
       return 'Heure invalide';
     }
-    
+   
     const { hours, minutes } = heureParsed;
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   }, [parseHeure]);
-
   const formatDateTime = useCallback((dateString: string, heure: string): string => {
     const formattedDate = formatDate(dateString);
     const formattedTime = formatTime(heure);
-    
+   
     if (formattedDate === 'Date invalide' || formattedTime === 'Heure invalide') {
       return 'Date/Heure invalide';
     }
-    
+   
     return `${formattedDate} à ${formattedTime}`;
   }, [formatDate, formatTime]);
-
   // Fonction pour calculer l'heure de passage automatique en non-comparution (17h le jour du rendez-vous)
   const getAutoNonComparutionTime = useCallback((rdv: Rendezvous): { date: string, time: string, datetime: Date } => {
     try {
       const rdvDate = getRendezvousDate(rdv);
-      
+     
       if (isNaN(rdvDate.getTime())) {
-        return { 
-          date: 'Date invalide', 
+        return {
+          date: 'Date invalide',
           time: 'Heure invalide',
           datetime: new Date('invalid')
         };
       }
-      
+     
       const autoTime = new Date(rdvDate);
       autoTime.setHours(17, 0, 0, 0);
-      
+     
       if (isNaN(autoTime.getTime())) {
-        return { 
-          date: 'Date invalide', 
+        return {
+          date: 'Date invalide',
           time: 'Heure invalide',
           datetime: new Date('invalid')
         };
       }
-      
+     
       const endDate = formatDate(rdv.date_rendez_vous);
       const endTime = '17:00';
-      
-      return { 
-        date: endDate, 
-        time: endTime, 
+     
+      return {
+        date: endDate,
+        time: endTime,
         datetime: autoTime
       };
     } catch (error) {
-      return { 
-        date: 'Erreur', 
+      return {
+        date: 'Erreur',
         time: 'Erreur',
         datetime: new Date('invalid')
       };
     }
   }, [getRendezvousDate, formatDate]);
-
   // Fonction pour vérifier si le bouton de validation est cliquable
   const isValidationButtonClickable = useCallback((rdv: Rendezvous): boolean => {
     try {
       const now = new Date();
       const rdvDate = getRendezvousDate(rdv);
-      
+     
       if (isNaN(now.getTime()) || isNaN(rdvDate.getTime())) {
         return false;
       }
-      
+     
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const rendezVousDay = new Date(rdvDate.getFullYear(), rdvDate.getMonth(), rdvDate.getDate());
-      
+     
       const normalizedStatut = normalizeStatut(rdv.statut);
       return today >= rendezVousDay && normalizedStatut !== 'Avec comparution';
     } catch (error) {
       return false;
     }
   }, [getRendezvousDate, normalizeStatut]);
-
   // Fonction pour vérifier si un rendez-vous devrait être en non-comparution
   const shouldBeNonComparution = useCallback((rdv: Rendezvous): boolean => {
     try {
       const now = new Date();
       const rdvDate = getRendezvousDate(rdv);
-      
+     
       if (isNaN(now.getTime()) || isNaN(rdvDate.getTime())) {
         return false;
       }
-      
+     
       const autoNonTime = getAutoNonComparutionTime(rdv);
-      
+     
       if (isNaN(autoNonTime.datetime.getTime())) {
         return false;
       }
-      
+     
       const normalizedStatut = normalizeStatut(rdv.statut);
       return now > autoNonTime.datetime && normalizedStatut === 'En cours';
     } catch (error) {
@@ -504,69 +484,65 @@ const RendezvousComponent: React.FC = () => {
       return false;
     }
   }, [getRendezvousDate, getAutoNonComparutionTime, normalizeStatut]);
-
   // Fonction pour vérifier si c'est le jour du rendez-vous
   const isRendezvousToday = useCallback((rdv: Rendezvous): boolean => {
     try {
       const now = new Date();
       const rdvDate = getRendezvousDate(rdv);
-      
+     
       if (isNaN(now.getTime()) || isNaN(rdvDate.getTime())) {
         return false;
       }
-      
+     
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const rendezVousDay = new Date(rdvDate.getFullYear(), rdvDate.getMonth(), rdvDate.getDate());
-      
+     
       return today.getTime() === rendezVousDay.getTime();
     } catch (error) {
       return false;
     }
   }, [getRendezvousDate]);
-
   // Fonction pour vérifier si le rendez-vous est dans le futur
   const isRendezvousFuture = useCallback((rdv: Rendezvous): boolean => {
     try {
       const now = new Date();
       const rdvDate = getRendezvousDate(rdv);
-      
+     
       if (isNaN(now.getTime()) || isNaN(rdvDate.getTime())) {
         return false;
       }
-      
+     
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const rendezVousDay = new Date(rdvDate.getFullYear(), rdvDate.getMonth(), rdvDate.getDate());
-      
+     
       return today < rendezVousDay;
     } catch (error) {
       return false;
     }
   }, [getRendezvousDate]);
-
   // Fonction pour obtenir le statut d'affichage
   const getDisplayStatus = useCallback((rdv: Rendezvous): string => {
     const normalizedStatut = normalizeStatut(rdv.statut);
-    
+   
     if (normalizedStatut !== 'En cours') {
       return normalizedStatut;
     }
-    
+   
     const isEligible = isValidationButtonClickable(rdv);
     const shouldBeAuto = shouldBeNonComparution(rdv);
     const isToday = isRendezvousToday(rdv);
     const isFuture = isRendezvousFuture(rdv);
-    
+   
     if (shouldBeAuto) {
       return 'non_comparution_soon';
     }
-    
+   
     if (isEligible) {
       return isToday ? 'validable_today' : 'validable';
     }
-    
+   
     return 'future';
   }, [isValidationButtonClickable, shouldBeNonComparution, isRendezvousToday, isRendezvousFuture, normalizeStatut]);
-
   // Fonction pour vérifier si eligible pour mise en demeure (7 jours après)
   const isEligibleForMiseEnDemeure = useCallback((rdv: Rendezvous): boolean => {
     try {
@@ -581,12 +557,11 @@ const RendezvousComponent: React.FC = () => {
       return false;
     }
   }, [getRendezvousDate, normalizeStatut]);
-
   // Fonction pour mettre à jour le statut automatiquement vers "Non comparution"
   const handleAutoNonComparution = useCallback(async (rdvId: string) => {
     try {
       console.log(`🔄 Tentative de passage automatique en Non comparution pour RDV ${rdvId}`);
-      
+     
       const response = await fetch(`http://localhost:3000/api/rendezvous/${rdvId}/statut`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -594,16 +569,15 @@ const RendezvousComponent: React.FC = () => {
           statut: 'Non comparution'
         })
       });
-
       if (response.ok) {
         const json = await response.json();
         if (json.success) {
           console.log(`✅ RDV ${rdvId} automatiquement marqué comme Non comparution`);
-          
-          setRendezvous(prev => prev.map(rdv => 
+         
+          setRendezvous(prev => prev.map(rdv =>
             rdv.id === rdvId ? { ...rdv, statut: 'Non comparution' } : rdv
           ));
-          
+         
           fetchStats();
         }
       } else {
@@ -613,7 +587,6 @@ const RendezvousComponent: React.FC = () => {
       console.error('Erreur lors de la mise à jour automatique du statut:', error);
     }
   }, [fetchStats]);
-
   // Fonction pour mettre à jour le statut manuellement
   const handleUpdateStatut = async (rdvId: string, nouveauStatut: Rendezvous['statut']) => {
     try {
@@ -625,48 +598,40 @@ const RendezvousComponent: React.FC = () => {
           statut: nouveauStatut
         })
       });
-
       if (!response.ok) {
         throw new Error('Erreur lors de la mise à jour du statut');
       }
-
       const json = await response.json();
       if (json.success) {
-        setRendezvous(prev => prev.map(rdv => 
+        setRendezvous(prev => prev.map(rdv =>
           rdv.id === rdvId ? { ...rdv, ...json.data } : rdv
         ));
-
         if (selectedRendezvous && selectedRendezvous.id === rdvId) {
           setSelectedRendezvous({ ...selectedRendezvous, ...json.data });
         }
-
         fetchStats();
       }
     } catch (error) {
       console.error('Erreur lors de la mise à jour du statut:', error);
-      alert('Erreur lors de la mise à jour du statut');
+      toast.error('Erreur lors de la mise à jour du statut');
     } finally {
       setIsLoading(false);
     }
   };
-
   // Fonction pour valider la comparution
   const handleValidationComparution = async (rdvId: string) => {
     await handleUpdateStatut(rdvId, 'Avec comparution');
   };
-
   // Fonction pour ouvrir le modal de confirmation F.T.
   const handleOpenFTModal = useCallback((rdv: Rendezvous) => {
     setRdvToValidate(rdv);
     setShowFTModal(true);
   }, []);
-
   // Fonction pour ouvrir le modal de mise en demeure
   const handleOpenMiseEnDemeureModal = useCallback((rdv: Rendezvous) => {
     setSelectedRdvForMiseEnDemeure(rdv);
     setShowMiseEnDemeureModal(true);
   }, []);
-
   // Fonction pour confirmer la validation F.T.
   const handleConfirmFT = useCallback(async () => {
     if (rdvToValidate) {
@@ -675,35 +640,32 @@ const RendezvousComponent: React.FC = () => {
       setRdvToValidate(null);
     }
   }, [rdvToValidate, handleValidationComparution]);
-
   useEffect(() => {
     fetchRendezvous();
     fetchStats();
   }, [fetchRendezvous, fetchStats]);
-
   // Vérification automatique des non-comparutions
   useEffect(() => {
     const checkNonComparutions = () => {
       const now = new Date();
       console.log(`🔍 Vérification automatique des non-comparutions à ${now.toLocaleString()}`);
       let needsUpdate = false;
-
       rendezvous.forEach(rdv => {
         const normalizedStatut = normalizeStatut(rdv.statut);
-        
+       
         if (normalizedStatut === 'En cours') {
           const autoNonTime = getAutoNonComparutionTime(rdv);
-          
+         
           if (!isNaN(autoNonTime.datetime.getTime())) {
             const shouldBeNonComparution = now > autoNonTime.datetime;
-            
+           
             console.log(`📅 RDV ${rdv.id} (${rdv.date_rendez_vous}):`, {
               maintenant: now.toLocaleString(),
               autoNonTime: autoNonTime.datetime.toLocaleString(),
               shouldBeNonComparution,
               statutActuel: rdv.statut
             });
-            
+           
             if (shouldBeNonComparution) {
               console.log(`⏰ RDV ${rdv.id} devrait être en Non comparution`);
               handleAutoNonComparution(rdv.id);
@@ -712,33 +674,28 @@ const RendezvousComponent: React.FC = () => {
           }
         }
       });
-      
+     
       if (needsUpdate) {
         console.log('🔄 Mise à jour des statuts nécessaire');
       }
     };
-
     const interval = setInterval(checkNonComparutions, 60000);
-    
+   
     if (rendezvous.length > 0) {
       console.log('🚀 Vérification initiale des non-comparutions');
       checkNonComparutions();
     }
-
     return () => clearInterval(interval);
   }, [rendezvous, getAutoNonComparutionTime, handleAutoNonComparution, normalizeStatut]);
-
   // Formater le lieu
   const formatLieu = useCallback((commune: string, fokontany: string, localite: string) => {
     const parts = [commune, fokontany, localite].filter(part => part && part.trim() !== '');
     return parts.join(' - ') || 'Lieu non spécifié';
   }, []);
-
   // Fonction sécurisée pour convertir en minuscules
   const safeToLowerCase = useCallback((value: string | undefined | null): string => {
     return value ? value.toLowerCase() : '';
   }, []);
-
   // Gérer la vue des détails
   const handleViewClick = useCallback(async (rdv: Rendezvous) => {
     try {
@@ -755,7 +712,6 @@ const RendezvousComponent: React.FC = () => {
     }
     setShowModal(true);
   }, []);
-
   // Toggle selection
   const toggleSelectRdv = useCallback((id: string) => {
     setSelectedRdv(prev =>
@@ -764,28 +720,25 @@ const RendezvousComponent: React.FC = () => {
         : [...prev, id]
     );
   }, []);
-
   // Filtered RDV avec useMemo pour optimiser les performances
   const filteredRendezvous = useMemo(() => {
     return rendezvous.filter(rdv => {
       const matchesFilter = filter === 'all' || normalizeStatut(rdv.statut) === filter;
-      
+     
       const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
+      const matchesSearch =
         safeToLowerCase(rdv.infraction).includes(searchLower) ||
         safeToLowerCase(rdv.commune).includes(searchLower) ||
         safeToLowerCase(rdv.fokontany).includes(searchLower) ||
         safeToLowerCase(rdv.nom_personne_r).includes(searchLower);
-      
+     
       return matchesFilter && matchesSearch;
     });
   }, [rendezvous, filter, searchTerm, safeToLowerCase, normalizeStatut]);
-
   // RDV non comparution prêts pour mise en demeure
   const nonComparutionReady = useMemo(() => {
     return filteredRendezvous.filter(rdv => isEligibleForMiseEnDemeure(rdv));
   }, [filteredRendezvous, isEligibleForMiseEnDemeure]);
-
   // Select all
   const selectAllRdv = useCallback(() => {
     const rdvIds = filteredRendezvous.map(rdv => rdv.id);
@@ -795,7 +748,6 @@ const RendezvousComponent: React.FC = () => {
       setSelectedRdv(rdvIds);
     }
   }, [filteredRendezvous, selectedRdv.length]);
-
   // Toggle category
   const toggleStatut = useCallback((statut: string) => {
     setExpandedStatuts(prev => {
@@ -808,7 +760,6 @@ const RendezvousComponent: React.FC = () => {
       return newSet;
     });
   }, []);
-
   // Grouped by statut avec useMemo
   const { groupedRendezvous, sortedGroups } = useMemo(() => {
     const grouped = filteredRendezvous.reduce((acc, rdv) => {
@@ -819,14 +770,11 @@ const RendezvousComponent: React.FC = () => {
       acc[normalizedStatut].push(rdv);
       return acc;
     }, {} as Record<Rendezvous['statut'], Rendezvous[]>);
-
     const sorted = Object.entries(grouped).sort(
       (a, b) => statusOrder.indexOf(a[0] as Rendezvous['statut']) - statusOrder.indexOf(b[0] as Rendezvous['statut'])
     );
-
     return { groupedRendezvous: grouped, sortedGroups: sorted };
   }, [filteredRendezvous, normalizeStatut]);
-
   // Fonctions pour la pagination
   const getPaginatedRendezvous = useCallback((rdvList: Rendezvous[], key: string) => {
     const currentPage = pagination[key] || 1;
@@ -834,18 +782,15 @@ const RendezvousComponent: React.FC = () => {
     const endIndex = startIndex + ITEMS_PER_PAGE;
     return rdvList.slice(startIndex, endIndex);
   }, [pagination]);
-
   const getTotalPages = useCallback((rdvList: Rendezvous[]) => {
     return Math.ceil(rdvList.length / ITEMS_PER_PAGE);
   }, []);
-
   const handlePageChange = useCallback((key: string, newPage: number) => {
     setPagination(prev => ({
       ...prev,
       [key]: newPage
     }));
   }, []);
-
   // Loading state pour le tableau principal
   if (isLoading && rendezvous.length === 0) {
     return (
@@ -862,7 +807,6 @@ const RendezvousComponent: React.FC = () => {
       </div>
     );
   }
-
   return (
     <div className="space-y-6 min-h-screen p-6 bg-gray-50">
       {/* Header */}
@@ -872,7 +816,6 @@ const RendezvousComponent: React.FC = () => {
           <p className="text-gray-600 mt-1">Suivi des rendez-vous planifiés</p>
         </div>
       </div>
-
       {/* Statistiques par catégorie */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {loadingStats ? (
@@ -891,7 +834,7 @@ const RendezvousComponent: React.FC = () => {
         ) : infractionStats.length > 0 ? (
           <>
             {infractionStats.map((stat) => {
-              const style = getStatusColorAndIcon(stat.categorie_consolidee); 
+              const style = getStatusColorAndIcon(stat.categorie_consolidee);
               return (
                 <div key={stat.categorie_consolidee} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between">
@@ -911,22 +854,7 @@ const RendezvousComponent: React.FC = () => {
                 </div>
               );
             })}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-600 text-sm font-medium">
-                    Total rendez-vous
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {totalRendezvous}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">rendez-vous</p>
-                </div>
-                <div className="p-3 rounded-full bg-indigo-500">
-                  <Calendar className="w-8 h-8 text-white" />
-                </div>
-              </div>
-            </div>
+          
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
@@ -951,7 +879,6 @@ const RendezvousComponent: React.FC = () => {
           </div>
         )}
       </div>
-
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -967,7 +894,7 @@ const RendezvousComponent: React.FC = () => {
               />
             </div>
           </div>
-          
+         
           <div className="flex flex-wrap gap-2">
             <select
               value={filter}
@@ -982,18 +909,16 @@ const RendezvousComponent: React.FC = () => {
           </div>
         </div>
       </div>
-
       {/* Rendez-vous List Grouped by Statut */}
       <div className="space-y-4">
         {sortedGroups.map(([statut, statutRdv]) => {
           const currentPage = pagination[statut] || 1;
           const totalPages = getTotalPages(statutRdv);
           const paginatedRdv = getPaginatedRendezvous(statutRdv, statut);
-
           return (
             <div key={statut} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               {/* Statut Header */}
-              <div 
+              <div
                 className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
                 onClick={() => toggleStatut(statut)}
               >
@@ -1017,7 +942,6 @@ const RendezvousComponent: React.FC = () => {
                   </div>
                 </div>
               </div>
-
               {/* Statut RDV */}
               {expandedStatuts.has(statut) && (
                 <div className="overflow-x-auto">
@@ -1046,7 +970,7 @@ const RendezvousComponent: React.FC = () => {
                         const shouldBeAutoNonComparution = shouldBeNonComparution(rdv);
                         const isToday = isRendezvousToday(rdv);
                         const displayStatus = getDisplayStatus(rdv);
-                        
+                       
                         return (
                           <tr key={rdv.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3">
@@ -1059,7 +983,7 @@ const RendezvousComponent: React.FC = () => {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center space-x-3">
-                                <div className={`p-2 rounded-lg ${getStatusColorAndIcon(rdv.statut).text}/10`}> 
+                                <div className={`p-2 rounded-lg ${getStatusColorAndIcon(rdv.statut).text}/10`}>
                                   {getStatutIcon(normalizeStatut(rdv.statut))}
                                 </div>
                                 <div className="min-w-0">
@@ -1070,7 +994,7 @@ const RendezvousComponent: React.FC = () => {
                                     {/* BADGE MISE EN DEMEURE */}
                                     {rdv.is_mise_en_demeure && (
                                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300 ml-2">
-                                        📧 Mise en demeure
+                                        📧 Mise en demeur
                                       </span>
                                     )}
                                   </div>
@@ -1153,7 +1077,7 @@ const RendezvousComponent: React.FC = () => {
                                 >
                                   <Eye className="w-4 h-4" />
                                 </button>
-                                
+                               
                                 {normalizeStatut(rdv.statut) !== 'Avec comparution' && (
                                   <button
                                     onClick={() => handleOpenFTModal(rdv)}
@@ -1179,7 +1103,6 @@ const RendezvousComponent: React.FC = () => {
                       })}
                     </tbody>
                   </table>
-
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
                       <div className="text-sm text-gray-700">
@@ -1198,7 +1121,7 @@ const RendezvousComponent: React.FC = () => {
                           <ChevronLeft className="w-4 h-4" />
                           <span>Précédent</span>
                         </button>
-                        
+                       
                         <button
                           onClick={() => handlePageChange(statut, currentPage + 1)}
                           disabled={currentPage === totalPages}
@@ -1219,12 +1142,11 @@ const RendezvousComponent: React.FC = () => {
             </div>
           );
         })}
-
         {/* Section dédiée pour les non-comparution prêtes pour mise en demeure (affichées en cards) */}
         {nonComparutionReady.length > 0 && (
           <div key="ready" className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {/* Header */}
-            <div 
+            <div
               className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
               onClick={() => toggleStatut('Ready')}
             >
@@ -1248,7 +1170,6 @@ const RendezvousComponent: React.FC = () => {
                 </div>
               </div>
             </div>
-
             {/* Cards */}
             {expandedStatuts.has('Ready') && (
               <div>
@@ -1313,7 +1234,6 @@ const RendezvousComponent: React.FC = () => {
                     </div>
                   ))}
                 </div>
-
                 {getTotalPages(nonComparutionReady) > 1 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
                     <div className="text-sm text-gray-700">
@@ -1351,25 +1271,23 @@ const RendezvousComponent: React.FC = () => {
             )}
           </div>
         )}
-
         {sortedGroups.length === 0 && nonComparutionReady.length === 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
             <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun rendez-vous</h3>
             <p className="text-gray-500">
               {searchTerm || filter !== 'all'
-                ? 'Aucun rendez-vous ne correspond à vos critères.' 
+                ? 'Aucun rendez-vous ne correspond à vos critères.'
                 : 'Vous n\'avez aucun rendez-vous pour le moment.'}
             </p>
           </div>
         )}
       </div>
-
       {/* Modal Faire FT */}
       {showFTModal && rdvToValidate && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[2000] ">
-          <div className="bg-white shadow-2xl w-full max-w-5xl  max-h-[95vh] flex flex-col p-4">
-            <div className="flex justify-between items-center  p-3 border-b border-gray-200 sticky top-0 bg-white z-10">
+          <div className="bg-white shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col p-4">
+            <div className="flex justify-between items-center p-3 border-b border-gray-200 sticky top-0 bg-white z-10">
               <div>
                 <h3 className="text-2xl font-bold text-gray-900">Faire F.T. et Valider la Comparution</h3>
               </div>
@@ -1380,19 +1298,16 @@ const RendezvousComponent: React.FC = () => {
                 <X className="w-6 h-6" />
               </button>
             </div>
-
             <div className="flex-1 overflow-y-scroll scrollbar-hide bg-gray-50">
               <div className="bg-white shadow-sm">
                 <FaireFT rendezvousData={rdvToValidate} onFTComplete={handleConfirmFT} />
               </div>
             </div>
-
             <div className="flex justify-between items-center p-3 border-t border-gray-200 sticky bottom-0 bg-white z-10">
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <Clock className="w-4 h-4" />
                 <span>Action définitive — Cette validation ne peut pas être annulée</span>
               </div>
-
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowFTModal(false)}
@@ -1400,34 +1315,12 @@ const RendezvousComponent: React.FC = () => {
                 >
                   Annuler
                 </button>
-
-                <button
-                  onClick={handleConfirmFT}
-                  disabled={isLoading}
-                  className={`px-6 py-2 rounded-lg text-white font-medium flex items-center gap-2 ${
-                    isLoading
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                      <span>Validation en cours...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Confirmer la validation</span>
-                    </>
-                  )}
-                </button>
+                
               </div>
             </div>
           </div>
         </div>
       )}
-
       {/* Modal Mise en Demeure */}
       {showMiseEnDemeureModal && selectedRdvForMiseEnDemeure && (
         <MiseEnDemeureModal
@@ -1440,7 +1333,6 @@ const RendezvousComponent: React.FC = () => {
           isLoading={isLoading}
         />
       )}
-
       {/* Modal de visualisation */}
       {showModal && selectedRendezvous && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[2000] flex justify-center items-center p-4">
@@ -1450,14 +1342,13 @@ const RendezvousComponent: React.FC = () => {
                 <h3 className="text-xl font-bold text-gray-900">Détails du rendez-vous</h3>
                 <p className="text-gray-600 mt-1">Informations complètes sur le rendez-vous</p>
               </div>
-              <button 
-                onClick={() => setShowModal(false)} 
+              <button
+                onClick={() => setShowModal(false)}
                 className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
-
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -1526,7 +1417,6 @@ const RendezvousComponent: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 mb-4">Informations de descente</h4>
                   <div className="space-y-4">
@@ -1557,7 +1447,6 @@ const RendezvousComponent: React.FC = () => {
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 mb-4">Localisation</h4>
@@ -1589,7 +1478,6 @@ const RendezvousComponent: React.FC = () => {
                     )}
                   </div>
                 </div>
-
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 mb-4">Participants</h4>
                   <div className="space-y-4">
@@ -1607,7 +1495,6 @@ const RendezvousComponent: React.FC = () => {
                   </div>
                 </div>
               </div>
-
               {normalizeStatut(selectedRendezvous.statut) !== 'Avec comparution' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h4 className="text-lg font-semibold text-blue-900 mb-3">Faire F.T.</h4>
@@ -1631,7 +1518,6 @@ const RendezvousComponent: React.FC = () => {
                   )}
                 </div>
               )}
-
               {normalizeStatut(selectedRendezvous.statut) === 'Avec comparution' && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <h4 className="text-lg font-semibold text-gray-900 mb-3">Statut définitif</h4>
@@ -1641,7 +1527,6 @@ const RendezvousComponent: React.FC = () => {
                   </p>
                 </div>
               )}
-
               {selectedRendezvous.notes && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 flex items-center gap-1 mb-2">
@@ -1654,7 +1539,6 @@ const RendezvousComponent: React.FC = () => {
                 </div>
               )}
             </div>
-
             <div className="flex justify-end items-center p-6 border-t border-gray-200 sticky bottom-0 bg-white">
               <button
                 onClick={() => setShowModal(false)}
@@ -1669,5 +1553,4 @@ const RendezvousComponent: React.FC = () => {
     </div>
   );
 };
-
 export default RendezvousComponent;
